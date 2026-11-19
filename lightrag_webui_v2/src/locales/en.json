@@ -9,7 +9,7 @@
   "header": {
     "documents": "Documents",
     "knowledgeGraph": "Knowledge Graph",
-    "retrieval": "Retrieval",
+    "retrieval": "Chat",
     "apiDocs": "API Documentation",
     "projectRepository": "Project Repository",
     "appSettings": "Settings",
@@ -216,7 +216,7 @@
     "fetchRetriesExhausted": "Failed to load graph data. Use refresh to try again.",
     "graphBuildFailed": "Failed to render graph data. Use refresh to retry.",
     "statusDialog": {
-      "title": "LightRAG Server Settings",
+      "title": "Uncode Server Settings",
       "description": "View current system status and connection information"
     },
     "legend": "Legend",

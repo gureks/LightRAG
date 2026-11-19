@@ -2,7 +2,7 @@ import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import { ChatMessage } from '@/components/retrieval/ChatMessage'
 import type { MessageWithError } from '@/types/retrieval'
-import { ChevronDownIcon, CopyIcon } from 'lucide-react'
+import { ChevronDownIcon, CopyIcon, ThumbsUpIcon, ThumbsDownIcon, DownloadIcon, RotateCcwIcon, NetworkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -34,6 +34,10 @@ export interface MessageListProps {
   isActive?: boolean
   /** Rendered centered when there are no messages. */
   emptyState?: ReactNode
+  /** Optional callback to re-run a user prompt */
+  onRedoQuery?: (prompt: string) => void
+  /** Optional callback to open the cited sources subgraph drawer */
+  onOpenCitations?: () => void
 }
 
 export default function MessageList({
@@ -41,9 +45,12 @@ export default function MessageList({
   isLoading,
   queryProgress,
   isActive = true,
-  emptyState = null
+  emptyState = null,
+  onRedoQuery,
+  onOpenCitations
 }: MessageListProps) {
   const { t } = useTranslation()
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, 'up' | 'down'>>({})
 
   // Reference to track if we should follow scroll during streaming (ref for
   // synchronous updates); isFollowing mirrors it for rendering.
@@ -340,16 +347,96 @@ export default function MessageList({
                     }
                   />
                   {message.role === 'assistant' && (
-                    <Button
-                      onClick={() => handleCopyMessage(message)}
-                      className="relative mb-2 size-6 shrink-0 rounded-md opacity-60 transition-opacity after:absolute after:-inset-2.5 after:content-[''] hover:opacity-100"
-                      tooltip={t('retrievePanel.chatMessage.copyTooltip')}
-                      aria-label={t('retrievePanel.chatMessage.copyTooltip')}
-                      variant="ghost"
-                      size="icon"
-                    >
-                      <CopyIcon className="size-4" aria-hidden="true" />
-                    </Button>
+                    <div className="mb-2 flex shrink-0 items-center gap-1">
+                      <Button
+                        onClick={() => handleCopyMessage(message)}
+                        className="relative size-6 shrink-0 rounded-md opacity-60 transition-opacity after:absolute after:-inset-2.5 after:content-[''] hover:opacity-100"
+                        tooltip={t('retrievePanel.chatMessage.copyTooltip')}
+                        aria-label={t('retrievePanel.chatMessage.copyTooltip')}
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <CopyIcon className="size-3.5" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setFeedbackMap((prev) => ({ ...prev, [message.id]: 'up' }))
+                          toast.success('Feedback recorded: Helpful response')
+                        }}
+                        className={`size-6 shrink-0 rounded-md transition-opacity ${
+                          feedbackMap[message.id] === 'up'
+                            ? 'text-primary opacity-100'
+                            : 'opacity-60 hover:opacity-100'
+                        }`}
+                        tooltip="Helpful"
+                        aria-label="Helpful"
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <ThumbsUpIcon className="size-3.5" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setFeedbackMap((prev) => ({ ...prev, [message.id]: 'down' }))
+                          toast.info('Feedback recorded: Marked for citation audit')
+                        }}
+                        className={`size-6 shrink-0 rounded-md transition-opacity ${
+                          feedbackMap[message.id] === 'down'
+                            ? 'text-destructive opacity-100'
+                            : 'opacity-60 hover:opacity-100'
+                        }`}
+                        tooltip="Flag response"
+                        aria-label="Flag response"
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <ThumbsDownIcon className="size-3.5" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const text = message.displayContent ?? message.content ?? ''
+                          const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+                          const url = URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          a.download = `uncode-response-${message.id.slice(0, 6)}.md`
+                          a.click()
+                          URL.revokeObjectURL(url)
+                          toast.success('Downloaded response as Markdown')
+                        }}
+                        className="size-6 shrink-0 rounded-md opacity-60 transition-opacity hover:opacity-100"
+                        tooltip="Download Markdown"
+                        aria-label="Download Markdown"
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <DownloadIcon className="size-3.5" aria-hidden="true" />
+                      </Button>
+                      {onRedoQuery && idx > 0 && messages[idx - 1]?.role === 'user' && (
+                        <Button
+                          onClick={() => onRedoQuery(messages[idx - 1].content || '')}
+                          className="size-6 shrink-0 rounded-md opacity-60 transition-opacity hover:opacity-100"
+                          tooltip="Regenerate response"
+                          aria-label="Regenerate response"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <RotateCcwIcon className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      )}
+                      {onOpenCitations && (
+                        <Button
+                          onClick={onOpenCitations}
+                          className="size-6 shrink-0 rounded-md opacity-60 transition-opacity hover:opacity-100"
+                          tooltip="Inspect Cited Sub-Graph"
+                          aria-label="Inspect Cited Sub-Graph"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <NetworkIcon className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               )

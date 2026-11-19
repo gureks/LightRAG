@@ -100,9 +100,9 @@ export const supportedFileTypes = {
 }
 
 export const SiteInfo = {
-  name: 'LightRAG',
+  name: 'Uncode',
   home: '/',
-  github: 'https://github.com/HKUDS/LightRAG'
+  github: 'https://github.com/gureks/KnowledgeOS'
 }
 
 // --- Graph layout performance thresholds ------------------------------------

@@ -216,7 +216,7 @@
     "fetchRetriesExhausted": "Gagal memuat data graf. Gunakan refresh untuk mencoba lagi.",
     "graphBuildFailed": "Gagal menampilkan data graf. Gunakan refresh untuk mencoba lagi.",
     "statusDialog": {
-      "title": "Pengaturan Server LightRAG",
+      "title": "Pengaturan Server Uncode",
       "description": "Lihat status sistem dan informasi koneksi saat ini"
     },
     "legend": "Legenda",

@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next'
 import { navigationService } from '@/services/navigation'
 import { ZapIcon, LogOutIcon, BookOpenIcon } from 'lucide-react'
 import { Chip } from '@heroui/react'
-import GithubIcon from '@/components/icons/GithubIcon'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
 import TouchDescriptionPopover from '@/components/ui/TouchDescriptionPopover'
 
@@ -43,6 +42,9 @@ function TabsNavigation() {
   return (
     <div className="flex h-8 self-center">
       <TabsList className="h-full gap-2">
+        <NavigationTab value="home" currentTab={currentTab}>
+          Home
+        </NavigationTab>
         <NavigationTab value="documents" currentTab={currentTab}>
           {t('header.documents')}
         </NavigationTab>
@@ -66,15 +68,15 @@ export default function SiteHeader() {
 
   const versionDisplay = (coreVersion && apiVersion)
     ? `${coreVersion}/${apiVersion}`
-    : null;
+    : null
 
-  const hasWarning = apiVersion?.endsWith('⚠️');
+  const hasWarning = apiVersion?.endsWith('⚠️')
   const versionTooltip = hasWarning
     ? t('header.frontendNeedsRebuild')
-    : versionDisplay ? `v${versionDisplay}` : '';
+    : versionDisplay ? `v${versionDisplay}` : ''
 
   const handleLogout = () => {
-    navigationService.navigateToUnauthenticated();
+    navigationService.navigateToUnauthenticated()
   }
 
   return (
@@ -136,11 +138,6 @@ export default function SiteHeader() {
               </a>
             </Button>
           )}
-          <Button variant="ghost" size="icon" side="bottom" tooltip={t('header.projectRepository')}>
-            <a href={SiteInfo.github} target="_blank" rel="noopener noreferrer">
-              <GithubIcon className="size-4" />
-            </a>
-          </Button>
           <AppSettings />
           {!isGuestMode && (
             <Button

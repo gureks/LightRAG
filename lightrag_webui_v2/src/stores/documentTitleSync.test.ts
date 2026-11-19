@@ -80,7 +80,7 @@ beforeAll(async () => {
   // not another test file imported the store first. The real (preloaded) one
   // is kept so `afterAll` can restore it for later files.
   realDocument = g.document
-  g.document = { title: 'LightRAG' }
+  g.document = { title: 'Uncode' }
   stateModule = await import('./state')
 })
 
@@ -115,7 +115,7 @@ describe('tab title follows the auth store', () => {
 
     // Cleared on the server: back to the generic name, not the stale one.
     auth().setCustomTitle(null, null)
-    expect(g.document!.title).toBe('LightRAG')
+    expect(g.document!.title).toBe('Uncode')
   })
 
   test('a cleared title is not overridden by the injected page-load value', () => {
@@ -132,7 +132,7 @@ describe('tab title follows the auth store', () => {
       expect(g.document!.title).toBe('Old KB')
 
       auth().setCustomTitle(null, null)
-      expect(g.document!.title).toBe('LightRAG')
+      expect(g.document!.title).toBe('Uncode')
     })
   })
 

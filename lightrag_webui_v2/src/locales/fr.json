@@ -216,7 +216,7 @@
     "fetchRetriesExhausted": "Échec du chargement des données du graphe. Utilisez l'actualisation pour réessayer.",
     "graphBuildFailed": "Échec du rendu des données du graphe. Utilisez l'actualisation pour réessayer.",
     "statusDialog": {
-      "title": "Paramètres du Serveur LightRAG",
+      "title": "Paramètres du Serveur Uncode",
       "description": "Afficher l'état actuel du système et les informations de connexion"
     },
     "legend": "Légende",

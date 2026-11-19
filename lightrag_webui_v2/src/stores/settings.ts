@@ -12,7 +12,17 @@ import { createFutureGuardedStorage } from '@/lib/guardedStorage'
 
 type Theme = 'dark' | 'light' | 'system'
 type Language = 'en' | 'zh' | 'fr' | 'ar' | 'zh_TW' | 'ru' | 'ja' | 'de' | 'uk' | 'ko' | 'vi' | 'id'
-type Tab = 'documents' | 'knowledge-graph' | 'retrieval'
+export type Tab =
+  | 'home'
+  | 'documents'
+  | 'knowledge-graph'
+  | 'retrieval'
+  | 'data-integrations'
+  | 'conflict-queue'
+  | 'agents'
+  | 'people'
+  | 'context'
+  | 'settings'
 
 // NOTE: `querySettings` and `retrievalHistory` were split out of this store
 // into their own persist keys — see stores/querySettings.ts,
@@ -100,7 +110,7 @@ interface SettingsState {
 const useSettingsStoreBase = create<SettingsState>()(
   persist(
     (set) => ({
-      theme: 'system',
+      theme: 'light',
       language: 'en',
       languageUserSelected: false,
       showPropertyPanel: true,
@@ -127,7 +137,7 @@ const useSettingsStoreBase = create<SettingsState>()(
 
       apiKey: null,
 
-      currentTab: 'documents',
+      currentTab: 'home',
       showFileName: false,
       documentsPageSize: 10,
 
