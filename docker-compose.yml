@@ -1,17 +1,59 @@
 services:
+  alloydb:
+    image: google/alloydbomni:16
+    container_name: lightrag-alloydb
+    shm_size: 1gb
+    ports:
+      - "${ALLOYDB_HOST_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-Zzt&T:5%7BvGe>9q}"
+      POSTGRES_DB: "${POSTGRES_DATABASE:-postgres}"
+    volumes:
+      - ./data/alloydb:/var/lib/postgresql/data
+      - ./data/alloydb_init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  # Optional sidecar for connecting directly to a remote GCP AlloyDB for PostgreSQL cluster
+  # without any LightRAG codebase changes. Activate with:
+  #   ALLOYDB_INSTANCE_URI=projects/<PROJECT>/locations/<REGION>/clusters/<CLUSTER>/instances/<INSTANCE> \
+  #   POSTGRES_HOST=alloydb-auth-proxy docker compose --profile gcp-cloud up -d
+  alloydb-auth-proxy:
+    image: gcr.io/alloydb-connectors/alloydb-auth-proxy:latest
+    container_name: lightrag-alloydb-proxy
+    profiles: ["gcp-cloud"]
+    command:
+      - "${ALLOYDB_INSTANCE_URI:-projects/PROJECT/locations/REGION/clusters/CLUSTER/instances/INSTANCE}"
+      - "--address=0.0.0.0"
+      - "--port=5432"
+    ports:
+      - "5433:5432"
+    restart: on-failure
+
   lightrag:
     image: ghcr.io/hkuds/lightrag:latest
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        WEBUI_DIR: "${WEBUI_DIR:-lightrag_webui_v2}"
       tags:
         - ghcr.io/hkuds/lightrag:latest
+    depends_on:
+      alloydb:
+        condition: service_healthy
     ports:
       - "${HOST:-0.0.0.0}:${PORT:-9621}:9621"
     volumes:
       - ./data/rag_storage:/app/data/rag_storage
       - ./data/inputs:/app/data/inputs
       - ./data/prompts:/app/data/prompts
+      - ./lightrag/api/webui:/app/lightrag/api/webui:ro
       # Optional user-defined UI content bundle (welcome page, login blurb
       # and user agreement, query empty state, brand logo). Read-only: the
       # server only ever reads it. See docs/UserDefinedUI.md.

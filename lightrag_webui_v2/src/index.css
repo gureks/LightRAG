@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+@import '@heroui/styles';
+
+@plugin 'tailwindcss-animate';
+@plugin 'tailwind-scrollbar';
+@plugin '@tailwindcss/typography';
+
+.prose code::before,
+.prose code::after {
+  content: '';
+}
+
+.prose-inherit-color {
+  --tw-prose-body: currentColor;
+  --tw-prose-headings: currentColor;
+  --tw-prose-lead: currentColor;
+  --tw-prose-links: currentColor;
+  --tw-prose-bold: currentColor;
+  --tw-prose-counters: currentColor;
+  --tw-prose-bullets: currentColor;
+  --tw-prose-quotes: currentColor;
+  --tw-prose-captions: currentColor;
+  --tw-prose-kbd: currentColor;
+  --tw-prose-code: currentColor;
+  --tw-prose-pre-code: currentColor;
+  --tw-prose-hr: color-mix(in oklab, currentColor 30%, transparent);
+  --tw-prose-quote-borders: color-mix(in oklab, currentColor 30%, transparent);
+  --tw-prose-th-borders: color-mix(in oklab, currentColor 30%, transparent);
+  --tw-prose-td-borders: color-mix(in oklab, currentColor 30%, transparent);
+}
+
+@source '../index.html';
+@source './**/*.{ts,tsx}';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Map existing semantic aliases to HeroUI default theme tokens without custom color overrides */
+:root {
+  --card: var(--surface, var(--background));
+  --card-foreground: var(--foreground);
+  --popover: var(--overlay, var(--background));
+  --popover-foreground: var(--foreground);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-foreground);
+  --secondary: var(--default);
+  --secondary-foreground: var(--default-foreground);
+  --muted: var(--default);
+  --muted-foreground: var(--muted, var(--default-foreground));
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-foreground);
+  --input: var(--border);
+  --ring: var(--focus, var(--accent));
+  --radius: 0.6rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Modal dialog scroll containment per modern-web-guidance (dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* KaTeX Math Formula Styles */
+.katex-display-wrapper {
+  text-align: center;
+  position: relative;
+}
+
+.katex-display-wrapper .katex-display {
+  margin: 0.5em 0;
+  text-align: center;
+}
+
+.katex-inline-wrapper .katex {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.katex .base,
+.katex .mord,
+.katex .mop,
+.katex .mbin,
+.katex .mrel,
+.katex .mpunct,
+.katex .mopen,
+.katex .mclose,
+.katex .minner {
+  color: inherit;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
+.katex-display > .katex {
+  white-space: nowrap;
+}
+
+.mermaidTooltip,
+body > [id^="dmermaid-"] {
+  position: fixed !important;
+}

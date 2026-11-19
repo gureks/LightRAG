@@ -5,15 +5,17 @@
 # cross-architecture emulation issues during multi-platform builds.
 FROM --platform=$BUILDPLATFORM oven/bun:1 AS frontend-builder
 
+ARG WEBUI_DIR=lightrag_webui_v2
+
 WORKDIR /app
 
 # Copy frontend source code
-COPY lightrag_webui/ ./lightrag_webui/
+COPY ${WEBUI_DIR}/ ./${WEBUI_DIR}/
 
 # Build frontend assets for inclusion in the API package
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    cd lightrag_webui \
-    && bun install --frozen-lockfile \
+    cd ${WEBUI_DIR} \
+    && bun install \
     && bun run build
 
 # Python build stage - using uv for faster package installation
