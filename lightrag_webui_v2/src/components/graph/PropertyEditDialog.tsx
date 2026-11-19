@@ -55,7 +55,7 @@ const PropertyEditDialog = ({
     switch (propertyName) {
       case 'description':
         return {
-        // No rows attribute for description to allow auto-sizing
+          // No rows attribute for description to allow auto-sizing
           className: 'max-h-[50vh] min-h-[10em] resize-y', // Maximum height 70% of viewport, minimum height ~20 lines, allow vertical resizing
           style: {
             height: '70vh', // Set initial height to 70% of viewport
@@ -147,7 +147,7 @@ const PropertyEditDialog = ({
               />
               <div>
                 <span>{t('graphPanel.propertiesView.mergeOptionLabel')}</span>
-                <p className="text-xs font-normal text-muted-foreground">
+                <p className="text-xs font-normal text-foreground">
                   {t('graphPanel.propertiesView.mergeOptionDescription')}
                 </p>
               </div>

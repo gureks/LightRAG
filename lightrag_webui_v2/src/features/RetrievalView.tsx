@@ -11,7 +11,14 @@ import { useTranslation } from 'react-i18next'
 import { prepareQueryInput, SUPPORTED_QUERY_MODES } from '@/features/retrieval/queryInput'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { Drawer } from '@heroui/react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/Select'
+import { Drawer, Surface } from '@heroui/react'
 import {
   Tooltip,
   TooltipContent,
@@ -101,19 +108,19 @@ export default function RetrievalView() {
         <div className="border-border bg-card flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 shadow-xs">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <BotIcon className="text-muted-foreground size-4" />
-              <select
-                value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
-                aria-label="Active Persona Agent"
-                className="border-border bg-background text-foreground h-7 rounded-md border px-2 text-xs font-medium focus:outline-none"
-              >
-                {agents.map((ag) => (
-                  <option key={ag.id} value={ag.id}>
-                    {ag.name} ({ag.role})
-                  </option>
-                ))}
-              </select>
+              <BotIcon className="text-foreground size-4" />
+              <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                <SelectTrigger aria-label="Active Persona Agent" className="h-7 w-52 text-xs font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {agents.map((ag) => (
+                    <SelectItem key={ag.id} value={ag.id}>
+                      {ag.name} ({ag.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Badge variant="secondary" className="text-[11px] font-normal uppercase">
               Mode: {queryMode}
@@ -130,7 +137,7 @@ export default function RetrievalView() {
                       <button
                         type="button"
                         onClick={() => handleOpenCitationSubgraph(cit)}
-                        className="border-border bg-muted/40 text-foreground hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors"
+                        className="border-border bg-default text-foreground hover:bg-default-hover inline-flex cursor-pointer items-center gap-1 rounded-xl border px-2 py-1 text-[11px] font-medium transition-colors"
                       >
                         <BookOpenCheckIcon className="size-3" />
                         <span>[{cit.id}]</span>
@@ -138,8 +145,8 @@ export default function RetrievalView() {
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[min(20rem,calc(100vw-2rem))] space-y-1 p-2.5 text-xs">
                       <div className="font-semibold">{cit.title}</div>
-                      <p className="text-muted-foreground text-[11px]">{cit.excerpt}</p>
-                      <div className="text-muted-foreground flex items-center justify-between pt-1 font-mono text-[10px]">
+                      <p className="text-foreground text-[11px]">{cit.excerpt}</p>
+                      <div className="text-foreground flex items-center justify-between pt-1 font-mono text-[10px]">
                         <span>Node: {cit.entities[0] || 'GraphCore'}</span>
                         <span>Score: {(cit.confidence * 100).toFixed(0)}%</span>
                       </div>
@@ -183,7 +190,7 @@ export default function RetrievalView() {
           onOpenCitations={() => setIsSubgraphDrawerOpen(true)}
           emptyState={
             <div className="flex max-w-lg flex-col items-center gap-3 text-center">
-              <div className="text-muted-foreground text-base">
+              <div className="text-foreground text-base">
                 {t('retrievePanel.retrieval.startPrompt')}
               </div>
               <div className="flex flex-wrap justify-center gap-1.5">
@@ -192,7 +199,7 @@ export default function RetrievalView() {
                     key={chip}
                     type="button"
                     onClick={() => handleSend(chip)}
-                    className="border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/40 inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors"
+                    className="border-border bg-surface text-foreground hover:bg-default inline-flex cursor-pointer items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors"
                   >
                     <SparklesIcon className="size-3" />
                     <span>{chip}</span>
@@ -206,13 +213,13 @@ export default function RetrievalView() {
         {/* Follow-up Suggestion Chips when conversation is active */}
         {session.messages.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 px-1">
-            <span className="text-muted-foreground text-[11px] font-medium">Follow-ups:</span>
+            <span className="text-foreground text-[11px] font-medium">Follow-ups:</span>
             {SUGGESTED_FOLLOW_UPS.map((chip) => (
               <button
                 key={chip}
                 type="button"
                 onClick={() => handleSend(chip)}
-                className="border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/40 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors"
+                className="border-border bg-surface text-foreground hover:bg-default inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors"
               >
                 <span>{chip}</span>
                 <ArrowUpRightIcon className="size-3" />
@@ -239,7 +246,7 @@ export default function RetrievalView() {
               <Drawer.Heading className="text-base font-semibold">
                 Retrieval & Engine Settings
               </Drawer.Heading>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-foreground text-xs">
                 Configure hybrid graph traversal parameters, reranking, and system prompt steering.
               </p>
             </Drawer.Header>
@@ -259,14 +266,14 @@ export default function RetrievalView() {
               <Drawer.Heading className="text-base font-semibold">
                 Cited Sources & Entity Sub-Graph
               </Drawer.Heading>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-foreground text-xs">
                 Provenance subgraph and verified document chunks grounding this response.
               </p>
             </Drawer.Header>
 
             <Drawer.Body className="space-y-4 overflow-y-auto py-4">
               {/* Interactive 2D Entity Sub-Graph Preview */}
-              <div className="border-border bg-muted/20 rounded-lg border p-4">
+              <Surface variant="secondary" className="border-border rounded-2xl border p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-foreground text-xs font-semibold">
                     Focused Entity Sub-Graph ({activeCitation.entities[0] || 'GraphCore'})
@@ -345,11 +352,11 @@ export default function RetrievalView() {
                     GraphCore
                   </text>
                 </svg>
-              </div>
+              </Surface>
 
               {/* Cited Chunks List */}
               <div className="space-y-2.5">
-                <h4 className="text-muted-foreground text-xs font-medium uppercase">
+                <h4 className="text-foreground text-xs font-medium uppercase">
                   Verified Source Chunks ({DEFAULT_CITATIONS.length})
                 </h4>
                 {DEFAULT_CITATIONS.map((cit) => {
@@ -358,10 +365,9 @@ export default function RetrievalView() {
                     <div
                       key={cit.id}
                       onClick={() => setActiveCitation(cit)}
-                      className={`cursor-pointer rounded-lg border p-3 transition-colors ${
-                        isSelected
-                          ? 'border-primary bg-muted/30'
-                          : 'border-border bg-card hover:bg-muted/20'
+                      className={`cursor-pointer rounded-2xl border p-3 transition-colors ${isSelected
+                        ? 'border-accent bg-surface-secondary'
+                        : 'border-border bg-surface hover:bg-surface-secondary'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -372,10 +378,10 @@ export default function RetrievalView() {
                           {(cit.confidence * 100).toFixed(0)}% match
                         </Badge>
                       </div>
-                      <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                      <p className="text-foreground mt-1.5 text-xs leading-relaxed">
                         {cit.excerpt}
                       </p>
-                      <div className="text-muted-foreground mt-2 flex items-center justify-between font-mono text-[10px]">
+                      <div className="text-foreground mt-2 flex items-center justify-between font-mono text-[10px]">
                         <span>Entity: {cit.entities[0] || 'GraphCore'}</span>
                         <span>valid_from: {cit.updatedAt}</span>
                       </div>

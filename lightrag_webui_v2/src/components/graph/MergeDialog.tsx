@@ -45,7 +45,7 @@ const MergeDialog = ({
             })}
           </DialogDescription>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-foreground">
           {t('graphPanel.propertiesView.mergeDialog.refreshHint')}
         </p>
         <DialogFooter className="mt-4 flex-col gap-2 sm:flex-row sm:justify-end">

@@ -204,7 +204,7 @@ export const ChatMessage = ({
   // pushing the row past a phone-width bubble.
   const timingRow =
     message.role === 'assistant' && typeof responseTime === 'number' ? (
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-foreground">
         <span className="flex items-center gap-1 tabular-nums">
           <ClockIcon className={cn('size-3', isQuerying && 'animate-spin')} />
           {t('retrievePanel.chatMessage.responseTime', { time: responseTime.toFixed(1) })}
@@ -219,7 +219,7 @@ export const ChatMessage = ({
           // Progress trails the time as a parenthesised note (no spinner — the
           // "Thinking..." hint above already carries one, so a second would be
           // redundant).
-          <span className="text-muted-foreground/70">
+          <span className="text-foreground/70">
             ({t(`retrievePanel.chatMessage.progress.${activeProgress}`, activeProgress)})
           </span>
         )}
@@ -234,13 +234,12 @@ export const ChatMessage = ({
   // phone-width screen.
   return (
     <div
-      className={`${
-        message.role === 'user'
-          ? 'max-w-[80%] bg-primary text-primary-foreground'
-          : message.isError
-            ? 'w-[95%] bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400'
-            : 'w-[95%] bg-muted'
-      } min-w-0 rounded-lg px-4 py-2`}
+      className={`${message.role === 'user'
+        ? 'max-w-[80%] bg-primary text-primary-foreground'
+        : message.isError
+          ? 'w-[95%] bg-danger-soft text-danger'
+          : 'w-[95%] bg-default text-foreground'
+      } min-w-0 rounded-2xl px-4 py-2`}
     >
       {/* Before any answer text: the timing row sits on top and the thinking
           hint appears beneath it, so the time doesn't jump when "Thinking..."
@@ -263,7 +262,7 @@ export const ChatMessage = ({
             // and aligns left with the answer instead. (The thinking spinner is
             // dropped — the timing row's clock already animates while thinking.)
             className={cn(
-              'flex items-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200 text-sm cursor-pointer select-none',
+              'text-foreground hover:text-foreground flex cursor-pointer items-center text-sm transition-colors duration-200 select-none',
               !hasContent && 'ml-4'
             )}
             onClick={() => {
@@ -285,7 +284,7 @@ export const ChatMessage = ({
           {isThinkingExpanded && finalThinkingContent && finalThinkingContent.trim() !== '' && (
             <div className="mt-2 pl-4 border-l-2 border-primary/20 dark:border-primary/40 text-sm prose dark:prose-invert max-w-none break-words prose-p:my-1 prose-headings:my-2 [&_sup]:text-[0.75em] [&_sup]:align-[0.1em] [&_sup]:leading-[0] [&_sub]:text-[0.75em] [&_sub]:align-[-0.2em] [&_sub]:leading-[0] [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800 [&_u]:underline [&_del]:line-through [&_ins]:underline [&_ins]:decoration-green-500 [&_.footnotes]:mt-6 [&_.footnotes]:pt-3 [&_.footnotes]:border-t [&_.footnotes]:border-border [&_.footnotes_ol]:text-xs [&_.footnotes_li]:my-0.5 [&_a[href^='#fn']]:text-primary [&_a[href^='#fn']]:no-underline [&_a[href^='#fn']]:hover:underline [&_a[href^='#fnref']]:text-primary [&_a[href^='#fnref']]:no-underline [&_a[href^='#fnref']]:hover:underline text-foreground">
               {isThinking && (
-                <div className="mb-2 text-xs text-gray-400 dark:text-gray-300 italic">
+                <div className="text-foreground mb-2 text-xs italic">
                   {t('retrievePanel.chatMessage.thinkingInProgress', 'Thinking in progress...')}
                 </div>
               )}
@@ -341,7 +340,7 @@ export const ChatMessage = ({
       {hasContent && timingRow}
       {/* User-terminated hint - response may be incomplete */}
       {message.isAborted && (
-        <div className="mt-1 text-xs italic text-muted-foreground">
+        <div className="mt-1 text-xs italic text-foreground">
           {t('retrievePanel.retrieval.userTerminated')}
         </div>
       )}
@@ -349,7 +348,7 @@ export const ChatMessage = ({
           notice would have nowhere to sit. It then gets the same row on its
           own rather than being dropped. */}
       {!timingRow && aiContentNotice && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-foreground">
           {aiContentNotice}
         </div>
       )}
@@ -390,14 +389,12 @@ const MessageMarkdown = memo(function MessageMarkdown({
 }) {
   return (
     <div className="relative">
-      <div className={`prose dark:prose-invert max-w-none text-sm break-words prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 [&_.katex]:text-current [&_.katex-display]:my-4 [&_.katex-display]:max-w-full [&_.katex-display_>.base]:overflow-x-auto [&_sup]:text-[0.75em] [&_sup]:align-[0.1em] [&_sup]:leading-[0] [&_sub]:text-[0.75em] [&_sub]:align-[-0.2em] [&_sub]:leading-[0] [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800 [&_u]:underline [&_del]:line-through [&_ins]:underline [&_ins]:decoration-green-500 [&_.footnotes]:mt-8 [&_.footnotes]:pt-4 [&_.footnotes]:border-t [&_.footnotes_ol]:text-sm [&_.footnotes_li]:my-1 ${
-        role === 'user'
-          ? 'text-primary-foreground prose-inherit-color'
-          : 'text-foreground'
-      } ${
-        role === 'user'
-          ? '[&_.footnotes]:border-primary-foreground/30 [&_a[href^="#fn"]]:text-primary-foreground [&_a[href^="#fn"]]:no-underline [&_a[href^="#fn"]]:hover:underline [&_a[href^="#fnref"]]:text-primary-foreground [&_a[href^="#fnref"]]:no-underline [&_a[href^="#fnref"]]:hover:underline'
-          : '[&_.footnotes]:border-border [&_a[href^="#fn"]]:text-primary [&_a[href^="#fn"]]:no-underline [&_a[href^="#fn"]]:hover:underline [&_a[href^="#fnref"]]:text-primary [&_a[href^="#fnref"]]:no-underline [&_a[href^="#fnref"]]:hover:underline'
+      <div className={`prose dark:prose-invert max-w-none text-sm break-words prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 [&_.katex]:text-current [&_.katex-display]:my-4 [&_.katex-display]:max-w-full [&_.katex-display_>.base]:overflow-x-auto [&_sup]:text-[0.75em] [&_sup]:align-[0.1em] [&_sup]:leading-[0] [&_sub]:text-[0.75em] [&_sub]:align-[-0.2em] [&_sub]:leading-[0] [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800 [&_u]:underline [&_del]:line-through [&_ins]:underline [&_ins]:decoration-green-500 [&_.footnotes]:mt-8 [&_.footnotes]:pt-4 [&_.footnotes]:border-t [&_.footnotes_ol]:text-sm [&_.footnotes_li]:my-1 ${role === 'user'
+        ? 'text-primary-foreground prose-inherit-color'
+        : 'text-foreground'
+      } ${role === 'user'
+        ? '[&_.footnotes]:border-primary-foreground/30 [&_a[href^="#fn"]]:text-primary-foreground [&_a[href^="#fn"]]:no-underline [&_a[href^="#fn"]]:hover:underline [&_a[href^="#fnref"]]:text-primary-foreground [&_a[href^="#fnref"]]:no-underline [&_a[href^="#fnref"]]:hover:underline'
+        : '[&_.footnotes]:border-border [&_a[href^="#fn"]]:text-primary [&_a[href^="#fn"]]:no-underline [&_a[href^="#fn"]]:hover:underline [&_a[href^="#fnref"]]:text-primary [&_a[href^="#fnref"]]:no-underline [&_a[href^="#fnref"]]:hover:underline'
       }`}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkFootnotes, remarkMath]}
@@ -550,7 +547,7 @@ const CodeHighlight = memo(({ inline, className, children, renderAsDiagram = fal
           if (!looksPotentiallyComplete) {
             console.log('Mermaid content might be incomplete, skipping render attempt:', rawContent);
             // Optionally keep loading indicator or show a message
-            // container.innerHTML = '<p class="text-sm text-muted-foreground">Waiting for complete diagram...</p>';
+            // container.innerHTML = '<p class="text-sm text-foreground">Waiting for complete diagram...</p>';
             return;
           }
 
@@ -623,9 +620,9 @@ const CodeHighlight = memo(({ inline, className, children, renderAsDiagram = fal
         clearTimeout(debounceTimerRef.current);
       }
     };
-  // Dependencies: renderAsDiagram ensures effect runs when diagram should be shown.
-  // Dependencies include all values used inside the effect to satisfy exhaustive-deps.
-  // The !hasRendered check prevents re-execution of render logic after success.
+    // Dependencies: renderAsDiagram ensures effect runs when diagram should be shown.
+    // Dependencies include all values used inside the effect to satisfy exhaustive-deps.
+    // The !hasRendered check prevents re-execution of render logic after success.
   }, [renderAsDiagram, hasRendered, language, children, theme]); // Add children and theme back
 
   // For large JSON, skip syntax highlighting completely and use a simple pre tag
@@ -673,10 +670,8 @@ const CodeHighlight = memo(({ inline, className, children, renderAsDiagram = fal
         ? 'bg-primary-foreground/20 text-primary-foreground border border-primary-foreground/30'
         : 'bg-primary-foreground/20 text-primary-foreground border border-primary-foreground/30';
     } else {
-      // Assistant messages have light background (bg-muted), need contrasting inline code
-      return theme === 'dark'
-        ? 'bg-muted-foreground/20 text-muted-foreground border border-muted-foreground/30'
-        : 'bg-slate-200 text-slate-800 border border-slate-300';
+      // Assistant messages have default surface background, need contrasting inline code
+      return 'bg-surface-secondary text-foreground border border-border';
     }
   };
 

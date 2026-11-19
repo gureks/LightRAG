@@ -275,7 +275,7 @@ const LoginPage = ({ autoActivateGuest = true }: LoginPageProps) => {
               )}
               <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">{content.brandTitle}</h1>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-foreground text-sm">
                   {t('login.description')}
                 </p>
               </div>
@@ -334,7 +334,7 @@ const LoginPage = ({ autoActivateGuest = true }: LoginPageProps) => {
                     aria-label={consentLabelText}
                     className="mt-0.5"
                   />
-                  <span className="text-muted-foreground text-sm leading-5">
+                  <span className="text-foreground text-sm leading-5">
                     {/* Two labels around the link, never one wrapping it: a
                         <label> that contained the button would toggle the
                         checkbox on every click meant to OPEN the document. */}

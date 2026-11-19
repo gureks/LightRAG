@@ -27,7 +27,7 @@ function NavigationTab({ value, currentTab, children }: NavigationTabProps) {
         'cursor-pointer px-2.5 py-1 transition-all',
         currentTab === value
           ? '!bg-primary !text-primary-foreground'
-          : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
+          : 'text-foreground hover:bg-background/60 hover:text-foreground'
       )}
     >
       {children}
@@ -90,7 +90,7 @@ export default function SiteHeader() {
                 <span className="font-bold md:inline-block">{SiteInfo.name}</span>
                 {webuiTitle && (
                   <>
-                    <span className="mx-1 text-xs text-muted-foreground" aria-hidden="true">|</span>
+                    <span className="mx-1 text-xs text-foreground" aria-hidden="true">|</span>
                     <span className="text-sm font-medium">{webuiTitle}</span>
                   </>
                 )}
@@ -121,7 +121,7 @@ export default function SiteHeader() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-xs text-muted-foreground mr-1 cursor-default">
+                  <span className="text-xs text-foreground mr-1 cursor-default">
                     v{versionDisplay}
                   </span>
                 </TooltipTrigger>

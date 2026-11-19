@@ -41,7 +41,7 @@ export default function WorkspaceEmptyState() {
       )}
       <CustomizedMarkdown
         content={content.queryEmptyMarkdown}
-        className="text-muted-foreground text-base"
+        className="text-foreground text-base"
       />
     </div>
   )

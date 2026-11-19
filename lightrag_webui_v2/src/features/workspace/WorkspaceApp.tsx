@@ -155,7 +155,7 @@ export default function WorkspaceApp() {
         </div>
         <nav className="flex shrink-0 items-center gap-1">
           {username && !isGuestMode && (
-            <span className="text-muted-foreground mr-1 hidden max-w-[10rem] truncate text-xs sm:inline">
+            <span className="text-foreground mr-1 hidden max-w-[10rem] truncate text-xs sm:inline">
               {username}
             </span>
           )}

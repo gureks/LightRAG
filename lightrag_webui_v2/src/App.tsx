@@ -186,7 +186,7 @@ function App() {
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">
                 <Spinner color="accent" size="lg" className="mx-auto mb-2" />
-                <p className="text-muted-foreground text-sm">Initializing...</p>
+                <p className="text-foreground text-sm">Initializing...</p>
               </div>
             </div>
           </div>

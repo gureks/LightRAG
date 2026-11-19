@@ -147,7 +147,7 @@ export default function PipelineStatusDialog({
               size="icon"
               className={cn(
                 'h-6 w-6',
-                position === 'left' && 'bg-zinc-200 text-zinc-800 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
+                position === 'left' && 'bg-default text-foreground'
               )}
               onClick={() => setPosition('left')}
             >
@@ -158,7 +158,7 @@ export default function PipelineStatusDialog({
               size="icon"
               className={cn(
                 'h-6 w-6',
-                position === 'center' && 'bg-zinc-200 text-zinc-800 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
+                position === 'center' && 'bg-default text-foreground'
               )}
               onClick={() => setPosition('center')}
             >
@@ -169,7 +169,7 @@ export default function PipelineStatusDialog({
               size="icon"
               className={cn(
                 'h-6 w-6',
-                position === 'right' && 'bg-zinc-200 text-zinc-800 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600'
+                position === 'right' && 'bg-default text-foreground'
               )}
               onClick={() => setPosition('right')}
             >
@@ -185,8 +185,8 @@ export default function PipelineStatusDialog({
             {/* Left side: Status indicators */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="text-sm font-medium">{t('documentPanel.pipelineStatus.busy')}:</div>
-                <div className={`h-2 w-2 rounded-full ${status?.busy ? 'bg-green-500' : 'bg-gray-300'}`} />
+                <div className="text-foreground text-sm font-medium">{t('documentPanel.pipelineStatus.busy')}:</div>
+                <div className={`h-2 w-2 rounded-full ${status?.busy ? 'bg-success' : 'bg-default'}`} />
               </div>
               {/* Only show cancellation status when it's requested */}
               {status?.cancellation_requested && (
@@ -239,7 +239,7 @@ export default function PipelineStatusDialog({
             <div
               ref={historyRef}
               onScroll={handleScroll}
-              className="font-mono text-xs rounded-md bg-zinc-800 text-zinc-100 p-3 overflow-y-auto overflow-x-hidden min-h-[7.5em] max-h-[40vh]"
+              className="border-border bg-surface-secondary text-foreground min-h-[7.5em] max-h-[40vh] overflow-x-hidden overflow-y-auto rounded-xl border p-3 font-mono text-xs"
             >
               {status?.history_messages?.length ? (
                 status.history_messages.map((msg, idx) => (

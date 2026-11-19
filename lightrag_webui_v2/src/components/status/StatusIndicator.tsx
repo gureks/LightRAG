@@ -38,7 +38,7 @@ const StatusIndicator = () => {
             animate && !health && 'shadow-[0_0_12px_rgba(239,68,68,0.4)]'
           )}
         />
-        <span className="text-muted-foreground text-xs">
+        <span className="text-foreground text-xs">
           {health ? t('graphPanel.statusIndicator.connected') : t('graphPanel.statusIndicator.disconnected')}
         </span>
       </div>

@@ -27,10 +27,10 @@ const ResetButton = ({ onClick, title }: { onClick: () => void; title: string })
         <button
           type="button"
           onClick={onClick}
-          className="mr-1 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="hover:bg-default text-foreground mr-1 rounded p-1 transition-colors"
           title={title}
         >
-          <RotateCcw className="h-3 w-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" />
+          <RotateCcw className="text-foreground h-3 w-3" />
         </button>
       </TooltipTrigger>
       <TooltipContent side="left">
@@ -92,7 +92,7 @@ export default function QuerySettings() {
         {/* The query entry (/workspace) reads these same settings from this browser's
             storage, so say whose queries they affect right where they are edited.
             One line here, the rest behind the help tooltip. */}
-        <div className="text-muted-foreground flex items-center gap-1 text-[11px] leading-none">
+        <div className="text-foreground flex items-center gap-1 text-[11px] leading-none">
           {/* One line, always: a longer translation is ellipsized rather than
               pushing the panel's controls down. The full text is in the tooltip. */}
           <span className="min-w-0 truncate">
@@ -208,7 +208,7 @@ export default function QuerySettings() {
                     className={cn(
                       'hover:bg-primary/5 h-9 cursor-pointer focus:ring-0 focus:ring-offset-0 focus:outline-0 active:right-0 flex-1 text-left [&>span]:break-all [&>span]:line-clamp-1',
                       showQualityWarning &&
-                        'border-red-400 bg-red-100 text-red-700 hover:bg-red-100 dark:border-red-600 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/30'
+                      'border-red-400 bg-red-100 text-red-700 hover:bg-red-100 dark:border-red-600 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/30'
                     )}
                   >
                     <SelectValue />

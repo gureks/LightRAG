@@ -143,8 +143,7 @@ function formatBytes(
   const accurateSizes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB']
   if (bytes === 0) return '0 Byte'
   const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(decimals)} ${
-    sizeType === 'accurate' ? (accurateSizes[i] ?? 'Bytes') : (sizes[i] ?? 'Bytes')
+  return `${(bytes / Math.pow(1024, i)).toFixed(decimals)} ${sizeType === 'accurate' ? (accurateSizes[i] ?? 'Bytes') : (sizes[i] ?? 'Bytes')
   }`
 }
 
@@ -329,9 +328,9 @@ function FileUploader(props: FileUploaderProps) {
           <div
             {...getRootProps()}
             className={cn(
-              'group border-muted-foreground/25 hover:bg-muted/25 relative grid h-52 w-full cursor-pointer place-items-center rounded-lg border-2 border-dashed px-5 py-2.5 text-center transition',
+              'group border-border hover:bg-default/40 relative grid h-52 w-full cursor-pointer place-items-center rounded-2xl border-2 border-dashed px-5 py-2.5 text-center transition',
               'ring-offset-background focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
-              isDragActive && 'border-muted-foreground/50',
+              isDragActive && 'border-accent bg-accent-soft',
               isDisabled && 'pointer-events-none opacity-60',
               className
             )}
@@ -341,23 +340,23 @@ function FileUploader(props: FileUploaderProps) {
             {isDragActive ? (
               <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
                 <div className="rounded-full border border-dashed p-3">
-                  <Upload className="text-muted-foreground size-7" aria-hidden="true" />
+                  <Upload className="text-foreground size-7" aria-hidden="true" />
                 </div>
-                <p className="text-muted-foreground font-medium">{t('documentPanel.uploadDocuments.fileUploader.dropHere')}</p>
+                <p className="text-foreground font-medium">{t('documentPanel.uploadDocuments.fileUploader.dropHere')}</p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
                 <div className="rounded-full border border-dashed p-3">
-                  <Upload className="text-muted-foreground size-7" aria-hidden="true" />
+                  <Upload className="text-foreground size-7" aria-hidden="true" />
                 </div>
                 <div className="flex flex-col gap-px">
-                  <p className="text-muted-foreground font-medium">
+                  <p className="text-foreground font-medium">
                     {t('documentPanel.uploadDocuments.fileUploader.dragAndDrop')}
                   </p>
                   {description ? (
-                    <p className="text-muted-foreground/70 text-sm">{description}</p>
+                    <p className="text-foreground text-sm">{description}</p>
                   ) : (
-                    <p className="text-muted-foreground/70 text-sm">
+                    <p className="text-foreground text-sm">
                       {t('documentPanel.uploadDocuments.fileUploader.uploadDescription', {
                         count: maxFileCount,
                         isMultiple: maxFileCount === Infinity,
@@ -434,8 +433,8 @@ function FileCard({ file, progress, error, onRemove }: FileCardProps) {
         )}
         <div className="flex w-full flex-col gap-2">
           <div className="flex flex-col gap-px">
-            <p className="text-foreground/80 line-clamp-1 text-sm font-medium">{file.name}</p>
-            <p className="text-muted-foreground text-xs">{formatBytes(file.size)}</p>
+            <p className="text-foreground line-clamp-1 text-sm font-medium">{file.name}</p>
+            <p className="text-foreground text-xs">{formatBytes(file.size)}</p>
           </div>
           {error ? (
             <div className="text-red-400 text-sm">
@@ -472,7 +471,7 @@ function FilePreview({ file }: FilePreviewProps) {
     return <div className="aspect-square shrink-0 rounded-md object-cover" />
   }
 
-  return <FileText className="text-muted-foreground size-10" aria-hidden="true" />
+  return <FileText className="text-foreground size-10" aria-hidden="true" />
 }
 
 export default FileUploader

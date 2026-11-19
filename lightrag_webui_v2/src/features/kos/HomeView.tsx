@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSettingsStore } from '@/stores/settings'
 import { useKosPlatformStore, DEFAULT_CITATIONS } from '@/stores/kosPlatform'
+import { ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -72,7 +73,7 @@ export default function HomeView() {
           })
           setChatSummary(
             res.response ||
-              `Based on the "${activeWorkspace.name}" knowledge fabric (${activeWorkspace.entityCount.toLocaleString()} entities), "${trimmed}" resolves across 3 verified policy nodes and 12 vector chunks with 95% confidence.`
+            `Based on the "${activeWorkspace.name}" knowledge fabric (${activeWorkspace.entityCount.toLocaleString()} entities), "${trimmed}" resolves across 3 verified policy nodes and 12 vector chunks with 95% confidence.`
           )
         } catch {
           setChatSummary(
@@ -103,7 +104,7 @@ export default function HomeView() {
           <h1 className="text-3xl font-bold tracking-tight">
             Ask anything across your knowledge fabric
           </h1>
-          <p className="text-muted-foreground max-w-xl text-sm">
+          <p className="text-foreground max-w-xl text-sm">
             Traverse versioned entity relationships, dense AlloyDB PGVector embeddings, and live StreamOS signals from one unified workspace.
           </p>
         </div>
@@ -113,33 +114,27 @@ export default function HomeView() {
           <CardContent className="p-4">
             <form onSubmit={handleExecute} className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
-                <div className="border-border bg-secondary/50 inline-flex items-center rounded-md border p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setFlowMode('search')}
-                    className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                      flowMode === 'search'
-                        ? 'bg-background text-foreground shadow-2xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
+                <ToggleButtonGroup
+                  selectionMode="single"
+                  disallowEmptySelection
+                  selectedKeys={new Set([flowMode])}
+                  onSelectionChange={(keys) => {
+                    const first = Array.from(keys)[0] as 'search' | 'chat' | undefined
+                    if (first) setFlowMode(first)
+                  }}
+                  size="sm"
+                >
+                  <ToggleButton id="search" className="text-foreground gap-1.5 text-xs">
                     <SearchIcon className="size-3.5" />
                     Semantic Search
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFlowMode('chat')}
-                    className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                      flowMode === 'chat'
-                        ? 'bg-background text-foreground shadow-2xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
+                  </ToggleButton>
+                  <ToggleButton id="chat" className="text-foreground gap-1.5 text-xs">
+                    <ToggleButtonGroup.Separator />
                     <MessageSquareIcon className="size-3.5" />
                     Summarized Chat
-                  </button>
-                </div>
-                <span className="text-muted-foreground text-xs">
+                  </ToggleButton>
+                </ToggleButtonGroup>
+                <span className="text-foreground text-xs">
                   Mode: <strong className="text-foreground">Hybrid Graph + Vector</strong>
                 </span>
               </div>
@@ -165,13 +160,13 @@ export default function HomeView() {
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-muted-foreground text-xs">Suggested:</span>
+                <span className="text-foreground text-xs">Suggested:</span>
                 {quickPrompts.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setQuery(prompt)}
-                    className="border-border bg-secondary/30 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer"
+                    className="border-border bg-secondary/30 hover:bg-secondary text-foreground hover:text-foreground rounded-md border px-2.5 py-1 text-xs transition-colors cursor-pointer"
                   >
                     {prompt}
                   </button>
@@ -208,7 +203,7 @@ export default function HomeView() {
                         <Badge variant="secondary">{item.entityType}</Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">
+                        <span className="text-foreground">
                           Updated {item.updatedAt}
                         </span>
                         <Badge variant="outline">
@@ -216,7 +211,7 @@ export default function HomeView() {
                         </Badge>
                       </div>
                     </div>
-                    <p className="text-muted-foreground text-sm leading-relaxed">
+                    <p className="text-foreground text-sm leading-relaxed">
                       {item.snippet}
                     </p>
                   </CardContent>
@@ -250,7 +245,7 @@ export default function HomeView() {
                 {chatSummary}
               </p>
               <div className="border-border flex flex-wrap items-center gap-2 border-t pt-3">
-                <span className="text-muted-foreground text-xs font-medium">
+                <span className="text-foreground text-xs font-medium">
                   Cited Sources:
                 </span>
                 {DEFAULT_CITATIONS.map((cit) => (
@@ -274,14 +269,14 @@ export default function HomeView() {
                 <CardDescription className="text-xs font-medium">
                   Knowledge Graph
                 </CardDescription>
-                <NetworkIcon className="text-muted-foreground size-4" />
+                <NetworkIcon className="text-foreground size-4" />
               </div>
               <CardTitle className="text-2xl font-bold tabular-nums">
                 {activeWorkspace.entityCount.toLocaleString()}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <p className="text-muted-foreground text-xs">
+              <p className="text-foreground text-xs">
                 {activeWorkspace.edgeCount.toLocaleString()} versioned relationships
               </p>
             </CardContent>
@@ -296,14 +291,14 @@ export default function HomeView() {
                 <CardDescription className="text-xs font-medium">
                   Live Data Sync
                 </CardDescription>
-                <RadioIcon className="text-muted-foreground size-4" />
+                <RadioIcon className="text-foreground size-4" />
               </div>
               <CardTitle className="text-2xl font-bold tabular-nums">
                 {pipelines.filter((p) => p.status === 'active').length} / {pipelines.length}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <p className="text-muted-foreground flex items-center gap-1 text-xs">
+              <p className="text-foreground flex items-center gap-1 text-xs">
                 <CheckCircle2Icon className="size-3.5" />
                 94.8% avg cache hit rate
               </p>
@@ -319,14 +314,14 @@ export default function HomeView() {
                 <CardDescription className="text-xs font-medium">
                   Conflict Queue
                 </CardDescription>
-                <AlertTriangleIcon className="text-muted-foreground size-4" />
+                <AlertTriangleIcon className="text-foreground size-4" />
               </div>
               <CardTitle className="text-2xl font-bold tabular-nums">
                 {conflicts.filter((c) => c.status === 'unresolved').length}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <p className="text-muted-foreground flex items-center gap-1 text-xs">
+              <p className="text-foreground flex items-center gap-1 text-xs">
                 <ClockIcon className="size-3.5" />
                 Discrepancies awaiting audit
               </p>
@@ -342,14 +337,14 @@ export default function HomeView() {
                 <CardDescription className="text-xs font-medium">
                   Active Agents
                 </CardDescription>
-                <SparklesIcon className="text-muted-foreground size-4" />
+                <SparklesIcon className="text-foreground size-4" />
               </div>
               <CardTitle className="text-2xl font-bold tabular-nums">
                 {agents.filter((a) => a.status === 'Active').length}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <p className="text-muted-foreground text-xs">
+              <p className="text-foreground text-xs">
                 CopilotSDK & PersonaCast live
               </p>
             </CardContent>

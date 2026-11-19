@@ -147,7 +147,7 @@ export default function PaginationControls({
               disabled={isLoading}
               className="h-8 w-12 text-center text-sm"
             />
-            <span className="text-sm text-gray-500">/ {totalPages}</span>
+            <span className="text-foreground text-sm">/ {totalPages}</span>
           </div>
 
           <Button
@@ -183,7 +183,7 @@ export default function PaginationControls({
 
   return (
     <div className={cn('flex items-center justify-between gap-4', className)}>
-      <div className="text-sm text-gray-500">
+      <div className="text-foreground text-sm">
         {t('pagination.showing', {
           start: Math.min((currentPage - 1) * pageSize + 1, totalCount),
           end: Math.min(currentPage * pageSize, totalCount),

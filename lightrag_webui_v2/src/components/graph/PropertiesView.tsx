@@ -238,12 +238,12 @@ const PropertyRow = ({
   // For non-editable fields, use the regular Text component
   return (
     <div className="flex items-center gap-2">
-      <span className="text-primary/60 tracking-wide whitespace-nowrap">
+      <span className="text-foreground font-medium tracking-wide whitespace-nowrap">
         {getPropertyNameTranslation(name)}
-        {name === 'source_id' && truncate && <sup className="text-red-500">†</sup>}
+        {name === 'source_id' && truncate && <sup className="text-danger">†</sup>}
       </span>:
       <Text
-        className="hover:bg-primary/20 rounded p-1 overflow-hidden text-ellipsis"
+        className="hover:bg-default text-foreground rounded p-1 overflow-hidden text-ellipsis"
         tooltipClassName="max-w-[min(24rem,calc(100vw-2rem))] -translate-x-13"
         text={formattedValue}
         tooltip={formattedTooltip}
@@ -286,21 +286,21 @@ const NodePropertiesView = ({ node, pipelineBusy }: { node: NodeType; pipelineBu
           )}
           <Button
             size="icon"
-            variant="ghost"
-            className="h-7 w-7 border border-gray-400 hover:bg-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
+            variant="outline"
+            className="h-7 w-7"
             onClick={handleExpandNode}
             tooltip={t('graphPanel.propertiesView.node.expandNode')}
           >
-            <GitBranchPlus className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+            <GitBranchPlus className="text-foreground h-4 w-4" />
           </Button>
           <Button
             size="icon"
-            variant="ghost"
-            className="h-7 w-7 border border-gray-400 hover:bg-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
+            variant="outline"
+            className="h-7 w-7"
             onClick={handlePruneNode}
             tooltip={t('graphPanel.propertiesView.node.pruneNode')}
           >
-            <Scissors className="h-4 w-4 text-gray-900 dark:text-gray-300" />
+            <Scissors className="text-foreground h-4 w-4" />
           </Button>
         </div>
       </div>

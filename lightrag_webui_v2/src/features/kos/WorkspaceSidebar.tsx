@@ -1,6 +1,6 @@
 import { useSettingsStore, type Tab } from '@/stores/settings'
 import { useKosPlatformStore } from '@/stores/kosPlatform'
-import { Chip } from '@heroui/react'
+import { Chip, ToggleButton, ToggleButtonGroup, Surface } from '@heroui/react'
 import Progress from '@/components/ui/Progress'
 import {
   Select,
@@ -125,7 +125,7 @@ export default function WorkspaceSidebar() {
         {/* Navigation Groups */}
         <nav aria-label="Main navigation" className="mt-1 flex flex-col gap-0.5">
           {!collapsed && (
-            <span className="text-muted-foreground px-2 py-1 text-[11px] font-medium tracking-wider uppercase">
+            <span className="text-foreground px-2 py-1 text-[11px] font-medium tracking-wider uppercase">
               Knowledge Fabric
             </span>
           )}
@@ -145,7 +145,7 @@ export default function WorkspaceSidebar() {
                     'flex items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors cursor-pointer',
                     isActive
                       ? 'bg-secondary text-foreground font-semibold'
-                      : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      : 'text-foreground hover:bg-secondary/50 hover:text-foreground'
                   )}
                 >
                   <span className="flex items-center gap-2.5 truncate">
@@ -157,7 +157,7 @@ export default function WorkspaceSidebar() {
             })}
 
           {!collapsed && (
-            <span className="text-muted-foreground mt-3 px-2 py-1 text-[11px] font-medium tracking-wider uppercase">
+            <span className="text-foreground mt-3 px-2 py-1 text-[11px] font-medium tracking-wider uppercase">
               Governance & Studio
             </span>
           )}
@@ -177,7 +177,7 @@ export default function WorkspaceSidebar() {
                     'flex items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors cursor-pointer',
                     isActive
                       ? 'bg-secondary text-foreground font-semibold'
-                      : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      : 'text-foreground hover:bg-secondary/50 hover:text-foreground'
                   )}
                 >
                   <span className="flex items-center gap-2.5 truncate">
@@ -198,58 +198,48 @@ export default function WorkspaceSidebar() {
       {/* Bottom: Tenant API Quota & Theme Toggle */}
       <div className="border-border flex flex-col gap-2.5 border-t p-3">
         {!collapsed && (
-          <div className="bg-secondary/30 border-border flex flex-col gap-1.5 rounded-lg border p-2.5">
+          <Surface variant="secondary" className="border-border flex flex-col gap-1.5 rounded-2xl border p-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-foreground">Tenant API Quota</span>
-              <span className="text-muted-foreground tabular-nums">{quotaPercent}%</span>
+              <span className="text-foreground tabular-nums">{quotaPercent}%</span>
             </div>
             <Progress value={quotaPercent} aria-label="Tenant API Quota usage" className="h-1.5" />
-            <div className="text-muted-foreground flex items-center justify-between text-[11px] tabular-nums">
+            <div className="text-foreground flex items-center justify-between text-[11px] tabular-nums">
               <span>
                 {activeWorkspace.queriesUsed.toLocaleString()} /{' '}
                 {activeWorkspace.queriesLimit.toLocaleString()} reqs
               </span>
               <span>{activeWorkspace.tokensUsedM}M tok</span>
             </div>
-          </div>
+          </Surface>
         )}
 
         <div className="flex items-center justify-between">
           {!collapsed && (
-            <span className="text-muted-foreground text-xs font-medium">
+            <span className="text-foreground text-xs font-medium">
               Appearance
             </span>
           )}
-          <div className="border-border bg-secondary/40 flex items-center gap-1 rounded-md border p-0.5">
-            <button
-              type="button"
-              onClick={() => setTheme('light')}
-              aria-label="Light mode"
-              className={cn(
-                'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors cursor-pointer',
-                theme !== 'dark'
-                  ? 'bg-background text-foreground shadow-2xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
+          <ToggleButtonGroup
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={new Set([theme === 'dark' ? 'dark' : 'light'])}
+            onSelectionChange={(keys) => {
+              const first = Array.from(keys)[0] as 'light' | 'dark' | undefined
+              if (first) setTheme(first)
+            }}
+            size="sm"
+          >
+            <ToggleButton id="light" aria-label="Light mode" className="text-foreground gap-1 px-2 text-xs">
               <SunIcon className="size-3.5" />
               {!collapsed && <span>Light</span>}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme('dark')}
-              aria-label="Dark mode"
-              className={cn(
-                'flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors cursor-pointer',
-                theme === 'dark'
-                  ? 'bg-background text-foreground shadow-2xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
+            </ToggleButton>
+            <ToggleButton id="dark" aria-label="Dark mode" className="text-foreground gap-1 px-2 text-xs">
+              <ToggleButtonGroup.Separator />
               <MoonIcon className="size-3.5" />
               {!collapsed && <span>Dark</span>}
-            </button>
-          </div>
+            </ToggleButton>
+          </ToggleButtonGroup>
         </div>
       </div>
     </aside>

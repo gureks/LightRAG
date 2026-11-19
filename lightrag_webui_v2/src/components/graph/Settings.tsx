@@ -163,7 +163,7 @@ const LabeledNumberInput = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 flex-shrink-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 flex-shrink-0 hover:bg-muted text-foreground hover:text-foreground"
             onClick={handleReset}
             type="button"
             title={t('graphPanel.sideBar.settings.resetToDefault')}
@@ -381,7 +381,7 @@ export default function Settings() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 flex-shrink-0 hover:bg-muted text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 flex-shrink-0 hover:bg-muted text-foreground hover:text-foreground"
                     onClick={() => useSettingsStore.setState({ minEdgeSize: 1, maxEdgeSize: 5 })}
                     type="button"
                     title={t('graphPanel.sideBar.settings.resetToDefault')}
@@ -414,7 +414,7 @@ export default function Settings() {
                 <Separator />
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm leading-none font-medium text-muted-foreground">
+                  <label className="text-sm leading-none font-medium text-foreground">
                     Dev Options
                   </label>
                   <Button

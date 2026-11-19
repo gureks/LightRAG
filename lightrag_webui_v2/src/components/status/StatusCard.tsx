@@ -278,7 +278,7 @@ const StatusCard = ({ status }: { status: LightragStatus | null }) => {
                     </TableCell>
                     <TableCell className="max-w-[170px] px-2 py-1">
                       <div className="truncate">{textValue(config.binding)}</div>
-                      <div className="text-muted-foreground truncate">
+                      <div className="text-foreground truncate">
                         {textValue(config.model)}
                       </div>
                     </TableCell>
@@ -289,7 +289,7 @@ const StatusCard = ({ status }: { status: LightragStatus | null }) => {
                         const kwargsStr = formatKwargs(providerOptions)
                         return (
                           <div
-                            className="text-muted-foreground truncate"
+                            className="text-foreground truncate"
                             title={kwargsStr !== '-' ? JSON.stringify(providerOptions, null, 2) : undefined}
                           >
                             {kwargsStr}
@@ -337,7 +337,7 @@ const StatusCard = ({ status }: { status: LightragStatus | null }) => {
               </TableRow>
               <TableRow className="hover:bg-muted/30">
                 {storageColumns.map(({ key, workspace }) => (
-                  <TableCell key={`${key}-workspace`} className="text-muted-foreground break-all px-2 py-1 align-top">
+                  <TableCell key={`${key}-workspace`} className="text-foreground break-all px-2 py-1 align-top">
                     {textValue(workspace)}
                   </TableCell>
                 ))}

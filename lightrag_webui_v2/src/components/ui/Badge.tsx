@@ -4,14 +4,14 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'chip inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+  'chip inline-flex items-center border px-2.5 py-0.5 text-xs font-medium transition-colors',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground shadow-xs',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        destructive: 'border-transparent bg-destructive text-destructive-foreground shadow-xs',
-        outline: 'border-border text-foreground bg-transparent'
+        default: 'chip--primary chip--accent border-transparent bg-accent text-accent-foreground',
+        secondary: 'chip--secondary chip--default border-transparent bg-default text-foreground',
+        destructive: 'chip--primary chip--danger border-transparent bg-danger text-danger-foreground',
+        outline: 'chip--tertiary border-border text-foreground bg-transparent'
       }
     },
     defaultVariants: {
@@ -37,7 +37,9 @@ function Badge({ className, variant = 'default', children, ...props }: BadgeProp
       variant={heroVariant}
       className={cn(badgeVariants({ variant }), className)}
     >
-      <span {...props}>{children}</span>
+      <span className="chip__label text-inherit" {...props}>
+        {children}
+      </span>
     </HeroChip>
   )
 }

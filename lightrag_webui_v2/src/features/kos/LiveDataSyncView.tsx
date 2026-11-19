@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useKosPlatformStore, type StreamPipeline } from '@/stores/kosPlatform'
-import { Chip } from '@heroui/react'
+import { Chip, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import {
   Table,
   TableBody,
@@ -9,6 +9,13 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/Table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/Select'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -112,38 +119,32 @@ export default function LiveDataSyncView() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Live Data Sync & Ingestion</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-foreground text-sm">
             Real-time StreamOS ingestion connectors, cache efficiency, and ingested document confidence telemetry.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="border-border bg-secondary/40 flex items-center gap-1 rounded-md border p-1">
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('pipelines')}
-              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                activeSubTab === 'pipelines'
-                  ? 'bg-background text-foreground shadow-2xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
+          <ToggleButtonGroup
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={new Set([activeSubTab])}
+            onSelectionChange={(keys) => {
+              const first = Array.from(keys)[0] as 'pipelines' | 'ingested-docs' | undefined
+              if (first) setActiveSubTab(first)
+            }}
+            size="sm"
+          >
+            <ToggleButton id="pipelines" className="text-foreground gap-1.5 text-xs">
               <RadioIcon className="size-3.5" />
               Active Pipelines ({pipelines.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('ingested-docs')}
-              className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                activeSubTab === 'ingested-docs'
-                  ? 'bg-background text-foreground shadow-2xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
+            </ToggleButton>
+            <ToggleButton id="ingested-docs" className="text-foreground gap-1.5 text-xs">
+              <ToggleButtonGroup.Separator />
               <FileTextIcon className="size-3.5" />
               Ingested Docs
-            </button>
-          </div>
+            </ToggleButton>
+          </ToggleButtonGroup>
         </div>
       </div>
 
@@ -157,7 +158,7 @@ export default function LiveDataSyncView() {
                 <CardTitle className="text-2xl font-bold tabular-nums">365 ms</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <span className="text-muted-foreground text-xs">
+                <span className="text-foreground text-xs">
                   In-process LightRAG Python API (`ainsert`)
                 </span>
               </CardContent>
@@ -169,7 +170,7 @@ export default function LiveDataSyncView() {
                 <CardTitle className="text-2xl font-bold tabular-nums">94.8%</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <span className="text-muted-foreground text-xs">
+                <span className="text-foreground text-xs">
                   Deduplicated before LLM token extraction
                 </span>
               </CardContent>
@@ -181,7 +182,7 @@ export default function LiveDataSyncView() {
                 <CardTitle className="text-2xl font-bold tabular-nums">99.6%</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <span className="text-muted-foreground text-xs">
+                <span className="text-foreground text-xs">
                   13,487 documents synced across {pipelines.length} streams
                 </span>
               </CardContent>
@@ -202,21 +203,24 @@ export default function LiveDataSyncView() {
                     onChange={(e) => setNewStreamName(e.target.value)}
                     required
                   />
-                  <select
-                    aria-label="Source type"
+                  <Select
                     value={newStreamType}
-                    onChange={(e) =>
-                      setNewStreamType(e.target.value as StreamPipeline['sourceType'])
+                    onValueChange={(value) =>
+                      setNewStreamType(value as StreamPipeline['sourceType'])
                     }
-                    className="border-border bg-background text-foreground h-9 rounded-md border px-3 text-sm"
                   >
-                    <option value="RSS/Atom">RSS/Atom</option>
-                    <option value="REST Webhook">REST Webhook</option>
-                    <option value="Kafka">Kafka</option>
-                    <option value="S3 Bucket">S3 Bucket</option>
-                    <option value="GitHub">GitHub</option>
-                    <option value="Confluence">Confluence</option>
-                  </select>
+                    <SelectTrigger aria-label="Source type" className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="RSS/Atom">RSS/Atom</SelectItem>
+                      <SelectItem value="REST Webhook">REST Webhook</SelectItem>
+                      <SelectItem value="Kafka">Kafka</SelectItem>
+                      <SelectItem value="S3 Bucket">S3 Bucket</SelectItem>
+                      <SelectItem value="GitHub">GitHub</SelectItem>
+                      <SelectItem value="Confluence">Confluence</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input
                     placeholder="Feed URL or topic endpoint"
                     value={newStreamEndpoint}
@@ -283,7 +287,7 @@ export default function LiveDataSyncView() {
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="text-sm font-medium">{pipe.name}</span>
-                            <span className="text-muted-foreground max-w-xs truncate font-mono text-xs">
+                            <span className="text-foreground max-w-xs truncate font-mono text-xs">
                               {pipe.endpoint}
                             </span>
                           </div>
@@ -313,7 +317,7 @@ export default function LiveDataSyncView() {
                           <span className="font-medium">
                             {pipe.docsIngested.toLocaleString()} docs
                           </span>{' '}
-                          <span className="text-muted-foreground">
+                          <span className="text-foreground">
                             ({pipe.chunksGenerated.toLocaleString()} chunks)
                           </span>
                         </TableCell>
@@ -397,7 +401,7 @@ export default function LiveDataSyncView() {
                               <span className="text-sm font-medium">
                                 {doc.file_path || doc.id}
                               </span>
-                              <span className="text-muted-foreground max-w-md truncate text-xs">
+                              <span className="text-foreground max-w-md truncate text-xs">
                                 {doc.content_summary || 'Indexed in AlloyDB PGVector & GraphCore'}
                               </span>
                             </div>
@@ -428,7 +432,7 @@ export default function LiveDataSyncView() {
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
+                          <TableCell className="text-foreground text-xs">
                             {new Date(doc.updated_at).toLocaleString()}
                           </TableCell>
                         </TableRow>
@@ -443,7 +447,7 @@ export default function LiveDataSyncView() {
                             <span className="text-sm font-medium">
                               {pipe.name.replace(/\s+/g, '_')}_Snapshot.md
                             </span>
-                            <span className="text-muted-foreground text-xs">
+                            <span className="text-foreground text-xs">
                               Ingested via {pipe.sourceType} ({pipe.endpoint})
                             </span>
                           </div>
@@ -464,7 +468,7 @@ export default function LiveDataSyncView() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
+                        <TableCell className="text-foreground text-xs">
                           {pipe.lastSync}
                         </TableCell>
                       </TableRow>
@@ -474,7 +478,7 @@ export default function LiveDataSyncView() {
               </Table>
             </div>
             {loadingDocs && (
-              <p className="text-muted-foreground mt-2 text-xs">
+              <p className="text-foreground mt-2 text-xs">
                 Syncing document ledger from AlloyDB...
               </p>
             )}

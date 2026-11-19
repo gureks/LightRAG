@@ -35,6 +35,7 @@ import {
   edgeColorDarkTheme,
   EDGE_PERF_LIMIT
 } from '@/lib/constants'
+import { ToggleButton, ToggleButtonGroup, Surface } from '@heroui/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -297,61 +298,44 @@ const GraphViewer = () => {
           )}
         </div>
 
-        <div
-          className="border-border bg-muted/40 inline-flex items-center rounded-md border p-0.5"
-          role="group"
+        <ToggleButtonGroup
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set([viewMode])}
+          onSelectionChange={(keys) => {
+            const first = Array.from(keys)[0] as FabricViewMode | undefined
+            if (first) setViewMode(first)
+          }}
+          size="sm"
           aria-label="Knowledge Fabric View Mode"
         >
-          <button
-            type="button"
-            onClick={() => setViewMode('graph')}
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              viewMode === 'graph'
-                ? 'bg-background text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
+          <ToggleButton id="graph" className="text-foreground gap-1.5 text-xs">
             <NetworkIcon className="size-3.5" />
             <span>Knowledge Graph</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('split')}
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              viewMode === 'split'
-                ? 'bg-background text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
+          </ToggleButton>
+          <ToggleButton id="split" className="text-foreground gap-1.5 text-xs">
+            <ToggleButtonGroup.Separator />
             <Columns2Icon className="size-3.5" />
             <span>Split View</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('vector')}
-            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              viewMode === 'vector'
-                ? 'bg-background text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
+          </ToggleButton>
+          <ToggleButton id="vector" className="text-foreground gap-1.5 text-xs">
+            <ToggleButtonGroup.Separator />
             <DatabaseIcon className="size-3.5" />
             <span>Vector Space</span>
-          </button>
-        </div>
+          </ToggleButton>
+        </ToggleButtonGroup>
       </div>
 
       {/* Main Content Area: Graph, Split, or Vector Space */}
       <div className="relative flex flex-1 overflow-hidden">
         {/* 2D Node-Link Knowledge Graph Pane (always mounted so Sigma WebGL context stays intact) */}
         <div
-          className={`relative h-full overflow-hidden ${
-            viewMode === 'vector'
-              ? 'hidden'
-              : viewMode === 'split'
-                ? 'border-border w-full border-r lg:w-3/5'
-                : 'w-full'
-          }`}
+          className={`relative h-full overflow-hidden ${viewMode === 'vector'
+            ? 'hidden'
+            : viewMode === 'split'
+              ? 'border-border w-full border-r lg:w-3/5'
+              : 'w-full'
+            }`}
         >
           <SigmaContainer
             settings={memoizedSigmaSettings}
@@ -417,9 +401,8 @@ const GraphViewer = () => {
         {/* Dense Vector Space Explorer Pane (visible in 'split' or 'vector' modes) */}
         {(viewMode === 'split' || viewMode === 'vector') && (
           <div
-            className={`bg-background flex h-full flex-col overflow-y-auto p-4 ${
-              viewMode === 'split' ? 'w-full lg:w-2/5' : 'w-full'
-            }`}
+            className={`bg-background flex h-full flex-col overflow-y-auto p-4 ${viewMode === 'split' ? 'w-full lg:w-2/5' : 'w-full'
+              }`}
           >
             <Card className="border-border bg-card shadow-xs">
               <CardHeader className="pb-3">
@@ -428,13 +411,13 @@ const GraphViewer = () => {
                     <CardTitle className="text-sm font-semibold">
                       Dense Vector Embeddings Explorer (AlloyDB PGVector)
                     </CardTitle>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
+                    <p className="text-foreground mt-0.5 text-xs">
                       Inspect cosine similarity scores, 1024-d Titan v2 embeddings, and linked
                       knowledge graph entities.
                     </p>
                   </div>
                   <div className="relative w-56">
-                    <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 size-3.5" />
+                    <SearchIcon className="text-foreground absolute top-2.5 left-2.5 size-3.5" />
                     <Input
                       value={vectorFilter}
                       onChange={(e) => setVectorFilter(e.target.value)}
@@ -463,7 +446,7 @@ const GraphViewer = () => {
                               <Badge variant="outline" className="w-fit font-mono text-[11px]">
                                 {vec.entityNode}
                               </Badge>
-                              <span className="text-muted-foreground font-mono text-[10px]">
+                              <span className="text-foreground font-mono text-[10px]">
                                 {vec.dimensions}
                               </span>
                             </div>
@@ -472,7 +455,7 @@ const GraphViewer = () => {
                             <div className="text-foreground text-xs font-medium">
                               {vec.docTitle}
                             </div>
-                            <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                            <p className="text-foreground mt-0.5 line-clamp-2 text-xs">
                               {vec.snippet}
                             </p>
                           </TableCell>
@@ -480,7 +463,7 @@ const GraphViewer = () => {
                             {(vec.similarityScore * 100).toFixed(1)}%
                           </TableCell>
                           <TableCell>
-                            <div className="text-muted-foreground flex items-center gap-1 font-mono text-[11px]">
+                            <div className="text-foreground flex items-center gap-1 font-mono text-[11px]">
                               <ClockIcon className="size-3" />
                               <span>{vec.validFrom} → current</span>
                             </div>
@@ -494,8 +477,8 @@ const GraphViewer = () => {
             </Card>
 
             {viewMode === 'split' && (
-              <div className="border-border bg-muted/20 mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-xs">
-                <span className="text-muted-foreground">
+              <Surface variant="secondary" className="border-border mt-3 flex items-center justify-between rounded-2xl border px-3 py-2 text-xs">
+                <span className="text-foreground">
                   Tip: Click any node in the graph to inspect properties, or double-click to expand
                   its 2-hop neighborhood.
                 </span>
@@ -507,7 +490,7 @@ const GraphViewer = () => {
                 >
                   Full Graph
                 </Button>
-              </div>
+              </Surface>
             )}
           </div>
         )}

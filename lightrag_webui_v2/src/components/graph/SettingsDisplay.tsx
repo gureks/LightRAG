@@ -16,7 +16,7 @@ const SettingsDisplay = () => {
   const graphEdgeCount = useGraphStore.use.graphEdgeCount()
 
   return (
-    <div className="absolute bottom-4 left-[calc(1rem+2.5rem)] flex items-center gap-2 text-xs text-gray-400">
+    <div className="text-foreground bg-surface/80 border-border absolute bottom-4 left-[calc(1rem+2.5rem)] flex items-center gap-2 rounded-lg border px-2 py-1 text-xs backdrop-blur-md">
       <div>{t('graphPanel.sideBar.settings.depth')}: {graphQueryMaxDepth}</div>
       <div>{t('graphPanel.sideBar.settings.node')}: {graphNodeCount}</div>
       <div>{t('graphPanel.sideBar.settings.edge')}: {graphEdgeCount}</div>

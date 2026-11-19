@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useKosPlatformStore, WorkspaceMember } from '@/stores/kosPlatform'
+import { Switch, Surface } from '@heroui/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import {
   Table,
@@ -9,11 +10,17 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/Table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/Select'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
-import Checkbox from '@/components/ui/Checkbox'
 import {
   BotIcon,
   Code2Icon,
@@ -75,7 +82,7 @@ export function AgentsView() {
                 CopilotSDK • /v1/personas
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-foreground mt-1 text-sm">
               Configure domain-bounded personas, retrieval modes, and embeddable widgets.
             </p>
           </div>
@@ -89,10 +96,9 @@ export function AgentsView() {
                 <Card
                   key={agent.id}
                   onClick={() => handleSelectAgent(agent.id, agent.systemPrompt)}
-                  className={`cursor-pointer border transition-colors ${
-                    isSelected
-                      ? 'border-primary bg-muted/20 shadow-sm'
-                      : 'border-border bg-card hover:bg-muted/20'
+                  className={`cursor-pointer border transition-colors ${isSelected
+                    ? 'border-accent bg-surface-secondary shadow-surface'
+                    : 'border-border bg-surface hover:bg-surface-secondary'
                   }`}
                 >
                   <CardContent className="p-4">
@@ -108,7 +114,7 @@ export function AgentsView() {
                               {agent.retrievalMode}
                             </Badge>
                           </div>
-                          <p className="text-muted-foreground mt-0.5 text-xs">
+                          <p className="text-foreground mt-0.5 text-xs">
                             {agent.role} • {agent.expression}
                           </p>
                         </div>
@@ -122,11 +128,11 @@ export function AgentsView() {
                     </div>
 
                     <div className="border-border mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs">
-                      <span className="text-muted-foreground font-mono text-[11px]">
+                      <span className="text-foreground font-mono text-[11px]">
                         Scope: {agent.corpus}
                       </span>
                       <div className="flex items-center gap-3">
-                        <span className="text-muted-foreground">
+                        <span className="text-foreground">
                           {agent.queriesHandled.toLocaleString()} queries
                         </span>
                         <Button
@@ -173,14 +179,14 @@ export function AgentsView() {
                     className="text-xs leading-relaxed"
                   />
                 </div>
-                <div className="border-border bg-muted/20 rounded-md border p-3">
-                  <span className="text-muted-foreground block text-[11px] font-medium uppercase">
+                <Surface variant="secondary" className="border-border rounded-xl border p-3">
+                  <span className="text-foreground block text-[11px] font-medium uppercase">
                     Embeddable Widget Snippet
                   </span>
                   <code className="text-foreground mt-1 block break-all font-mono text-[11px]">
                     {`<script src="https://cdn.uncode.ai/copilot-widget.js" data-agent-id="${selectedAgent.id}" async></script>`}
                   </code>
-                </div>
+                </Surface>
                 <Button size="sm" className="w-full" onClick={handleSavePrompt}>
                   Save Persona Policy
                 </Button>
@@ -227,7 +233,7 @@ export function PeopleView() {
                 Multi-Tenant Access • /v1/team/members
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-foreground mt-1 text-sm">
               Manage role-based access controls, audit reviewer permissions, and tenant scoping.
             </p>
           </div>
@@ -257,17 +263,20 @@ export function PeopleView() {
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
             />
-            <select
+            <Select
               value={role}
-              onChange={(e) => setRole(e.target.value as WorkspaceMember['role'])}
-              className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
-              aria-label="Member Role"
+              onValueChange={(value) => setRole(value as WorkspaceMember['role'])}
             >
-              <option value="Admin">Admin</option>
-              <option value="Editor">Editor</option>
-              <option value="Reviewer">Reviewer</option>
-              <option value="Viewer">Viewer</option>
-            </select>
+              <SelectTrigger aria-label="Member Role" className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Admin">Admin</SelectItem>
+                <SelectItem value="Editor">Editor</SelectItem>
+                <SelectItem value="Reviewer">Reviewer</SelectItem>
+                <SelectItem value="Viewer">Viewer</SelectItem>
+              </SelectContent>
+            </Select>
             <Button onClick={handleInvite} className="gap-1.5">
               <UsersIcon className="size-3.5" />
               Grant Access
@@ -294,25 +303,28 @@ export function PeopleView() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-foreground text-sm font-medium">{m.name}</span>
-                        <span className="text-muted-foreground text-xs">{m.email}</span>
+                        <span className="text-foreground text-xs">{m.email}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-xs">{m.department}</TableCell>
                     <TableCell>
-                      <select
+                      <Select
                         value={m.role}
-                        onChange={(e) => {
-                          updateMemberRole(m.id, e.target.value as WorkspaceMember['role'])
-                          toast.success(`Updated ${m.name}'s role to ${e.target.value}`)
+                        onValueChange={(value) => {
+                          updateMemberRole(m.id, value as WorkspaceMember['role'])
+                          toast.success(`Updated ${m.name}'s role to ${value}`)
                         }}
-                        className="border-border bg-background text-foreground h-8 rounded-md border px-2 text-xs font-medium"
-                        aria-label={`Role for ${m.name}`}
                       >
-                        <option value="Admin">Admin</option>
-                        <option value="Editor">Editor</option>
-                        <option value="Reviewer">Reviewer</option>
-                        <option value="Viewer">Viewer</option>
-                      </select>
+                        <SelectTrigger aria-label={`Role for ${m.name}`} className="h-8 w-32 text-xs font-medium">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Editor">Editor</SelectItem>
+                          <SelectItem value="Reviewer">Reviewer</SelectItem>
+                          <SelectItem value="Viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -327,7 +339,7 @@ export function PeopleView() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{m.lastActive}</TableCell>
+                    <TableCell className="text-foreground text-xs">{m.lastActive}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -355,7 +367,7 @@ export function ContextView() {
               GraphCore Temporal Graph
             </Badge>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-foreground mt-1 text-sm">
             Manage entity extraction types, temporal validity windows (valid_from / valid_to), and
             confidence thresholds.
           </p>
@@ -382,7 +394,7 @@ export function ContextView() {
                         {item.code} ({item.label})
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell className="text-foreground text-xs">
                       {item.description}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
@@ -393,15 +405,20 @@ export function ContextView() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex items-center gap-2">
-                        <ClockIcon className="text-muted-foreground size-3.5" />
-                        <Checkbox
-                          checked={item.temporalTracking}
-                          onCheckedChange={() => {
+                        <ClockIcon className="text-foreground size-3.5" />
+                        <Switch
+                          isSelected={item.temporalTracking}
+                          onChange={() => {
                             toggleOntologyTemporal(item.id)
                             toast.success(`Updated temporal tracking for ${item.label}`)
                           }}
                           aria-label={`Temporal tracking for ${item.label}`}
-                        />
+                          size="sm"
+                        >
+                          <Switch.Control>
+                            <Switch.Thumb />
+                          </Switch.Control>
+                        </Switch>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -437,7 +454,7 @@ export function SettingsView() {
           <h1 className="text-foreground text-xl font-semibold tracking-tight">
             Workspace & Platform Settings
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-foreground mt-1 text-sm">
             Tenant isolation boundaries, API keys, and AlloyDB pgvector storage parameters.
           </p>
         </div>
@@ -455,15 +472,15 @@ export function SettingsView() {
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
               <div className="border-border flex items-center justify-between border-b py-1.5">
-                <span className="text-muted-foreground">Workspace Name</span>
+                <span className="text-foreground">Workspace Name</span>
                 <span className="text-foreground font-medium">{activeWs.name}</span>
               </div>
               <div className="border-border flex items-center justify-between border-b py-1.5">
-                <span className="text-muted-foreground">Tenant Namespace ID</span>
+                <span className="text-foreground">Tenant Namespace ID</span>
                 <span className="text-foreground font-mono">{activeWs.id}</span>
               </div>
               <div className="flex items-center justify-between py-1.5">
-                <span className="text-muted-foreground">Storage Engine</span>
+                <span className="text-foreground">Storage Engine</span>
                 <Badge variant="secondary" className="text-[11px] font-normal">
                   AlloyDB Omni PGVector + Graph
                 </Badge>
@@ -482,7 +499,7 @@ export function SettingsView() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="border-border bg-muted/30 flex items-center justify-between rounded-md border px-3 py-2">
+              <Surface variant="secondary" className="border-border flex items-center justify-between rounded-xl border px-3 py-2">
                 <code className="text-foreground truncate font-mono text-xs">{sampleKey}</code>
                 <Button
                   size="sm"
@@ -497,8 +514,8 @@ export function SettingsView() {
                   )}
                   Copy
                 </Button>
-              </div>
-              <p className="text-muted-foreground text-[11px]">
+              </Surface>
+              <p className="text-foreground text-[11px]">
                 Scoped strictly to <span className="font-mono">{activeWs.id}</span> with row level
                 security.
               </p>

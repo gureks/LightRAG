@@ -34,7 +34,7 @@ export default function CustomizedCopyright({
     <footer
       dir={direction}
       className={cn(
-        'text-muted-foreground w-full shrink-0 text-center text-xs',
+        'text-foreground w-full shrink-0 text-center text-xs',
         className
       )}
     >

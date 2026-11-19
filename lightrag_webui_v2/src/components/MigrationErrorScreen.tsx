@@ -41,7 +41,7 @@ export default function MigrationErrorScreen() {
           ? t('migration.dataLostTitle', 'Some saved settings could not be recovered')
           : t('migration.failedTitle', 'Failed to prepare local settings')}
       </h1>
-      <p className="text-muted-foreground max-w-md text-sm">
+      <p className="text-foreground max-w-md text-sm">
         {dataLost
           ? t(
             'migration.dataLostBody',

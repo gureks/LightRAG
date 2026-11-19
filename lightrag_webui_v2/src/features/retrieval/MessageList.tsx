@@ -304,7 +304,7 @@ export default function MessageList({
         // rather than widening the conversation. Plain `overflow-auto` turned
         // both into a horizontal scrollbar on narrow screens — visible from
         // the very first short message.
-        className="bg-primary-foreground/60 absolute inset-0 flex flex-col overflow-y-auto overflow-x-hidden rounded-lg border p-2"
+        className="bg-surface text-foreground border-border absolute inset-0 flex flex-col overflow-x-hidden overflow-y-auto rounded-2xl border p-2"
       >
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           {messages.length === 0 ? (

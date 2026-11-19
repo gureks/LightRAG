@@ -270,7 +270,7 @@ const DocumentStatusDetailsDialog = ({ doc }: { doc: DocStatusResponse }) => {
         className="max-w-2xl"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
-          ;(e.currentTarget as HTMLElement | null)?.focus()
+          ; (e.currentTarget as HTMLElement | null)?.focus()
         }}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -302,47 +302,6 @@ const DocumentStatusDetailsDialog = ({ doc }: { doc: DocStatusResponse }) => {
     </Dialog>
   )
 }
-
-const pulseStyle = `
-@keyframes pulse {
-  0% {
-    background-color: rgb(255 0 0 / 0.1);
-    border-color: rgb(255 0 0 / 0.2);
-  }
-  50% {
-    background-color: rgb(255 0 0 / 0.2);
-    border-color: rgb(255 0 0 / 0.4);
-  }
-  100% {
-    background-color: rgb(255 0 0 / 0.1);
-    border-color: rgb(255 0 0 / 0.2);
-  }
-}
-
-.dark .pipeline-busy {
-  animation: dark-pulse 2s infinite;
-}
-
-@keyframes dark-pulse {
-  0% {
-    background-color: rgb(255 0 0 / 0.2);
-    border-color: rgb(255 0 0 / 0.4);
-  }
-  50% {
-    background-color: rgb(255 0 0 / 0.3);
-    border-color: rgb(255 0 0 / 0.6);
-  }
-  100% {
-    background-color: rgb(255 0 0 / 0.2);
-    border-color: rgb(255 0 0 / 0.4);
-  }
-}
-
-.pipeline-busy {
-  animation: pulse 2s infinite;
-  border: 1px solid;
-}
-`;
 
 // Type definitions for sort field and direction
 type SortField = 'created_at' | 'updated_at' | 'id' | 'file_path';
@@ -651,16 +610,6 @@ export default function DocumentManager() {
   // which is distinct from a digest that happens to be empty — see the effect
   // that consumes it for why the distinction matters on the mount pass.
   const prevStatusFingerprint = useRef<string | null>(null)
-
-  // Add pulse style to document
-  useEffect(() => {
-    const style = document.createElement('style')
-    style.textContent = pulseStyle
-    document.head.appendChild(style)
-    return () => {
-      document.head.removeChild(style)
-    }
-  }, [])
 
   // Reference to the card content element
   const cardContentRef = useRef<HTMLDivElement>(null);
@@ -1511,7 +1460,7 @@ export default function DocumentManager() {
               tooltip={t('documentPanel.documentManager.pipelineStatusTooltip')}
               size="sm"
               className={cn(
-                pipelineActive && 'pipeline-busy'
+                pipelineActive && 'bg-danger-soft text-danger border-danger animate-pulse'
               )}
             >
               <ActivityIcon /> {t('documentPanel.documentManager.pipelineStatusButton')}
@@ -1582,7 +1531,7 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('all')}
                     disabled={isRefreshing}
                     className={cn(
-                      statusFilter === 'all' && 'bg-gray-100 dark:bg-gray-900 font-medium border border-gray-400 dark:border-gray-500 shadow-sm'
+                      statusFilter === 'all' && 'bg-default text-foreground border-border font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.all')} ({statusCounts.all ?? 0})
@@ -1593,8 +1542,8 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('completed')}
                     disabled={isRefreshing}
                     className={cn(
-                      completedCount > 0 ? 'text-green-600' : 'text-gray-500',
-                      statusFilter === 'completed' && 'bg-green-100 dark:bg-green-900/30 font-medium border border-green-400 dark:border-green-600 shadow-sm'
+                      completedCount > 0 ? 'text-success' : 'text-foreground',
+                      statusFilter === 'completed' && 'bg-success-soft text-foreground border-success font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.completed')} ({completedCount})
@@ -1605,8 +1554,8 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('parse')}
                     disabled={isRefreshing}
                     className={cn(
-                      parseCount > 0 ? 'text-cyan-600' : 'text-gray-500',
-                      statusFilter === 'parse' && 'bg-cyan-100 dark:bg-cyan-900/30 font-medium border border-cyan-400 dark:border-cyan-600 shadow-sm'
+                      parseCount > 0 ? 'text-accent' : 'text-foreground',
+                      statusFilter === 'parse' && 'bg-accent-soft text-foreground border-accent font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.parse')} ({parseCount})
@@ -1617,8 +1566,8 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('analyze')}
                     disabled={isRefreshing}
                     className={cn(
-                      analyzeCount > 0 ? 'text-indigo-600' : 'text-gray-500',
-                      statusFilter === 'analyze' && 'bg-indigo-100 dark:bg-indigo-900/30 font-medium border border-indigo-400 dark:border-indigo-600 shadow-sm'
+                      analyzeCount > 0 ? 'text-accent' : 'text-foreground',
+                      statusFilter === 'analyze' && 'bg-accent-soft text-foreground border-accent font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.analyze')} ({analyzeCount})
@@ -1629,8 +1578,8 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('process')}
                     disabled={isRefreshing}
                     className={cn(
-                      processCount > 0 ? 'text-blue-600' : 'text-gray-500',
-                      statusFilter === 'process' && 'bg-blue-100 dark:bg-blue-900/30 font-medium border border-blue-400 dark:border-blue-600 shadow-sm'
+                      processCount > 0 ? 'text-accent' : 'text-foreground',
+                      statusFilter === 'process' && 'bg-accent-soft text-foreground border-accent font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.process')} ({processCount})
@@ -1641,8 +1590,8 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('deleting')}
                     disabled={isRefreshing}
                     className={cn(
-                      deletingCount > 0 ? 'text-orange-600' : 'text-gray-500',
-                      statusFilter === 'deleting' && 'bg-orange-100 dark:bg-orange-900/30 font-medium border border-orange-400 dark:border-orange-600 shadow-sm'
+                      deletingCount > 0 ? 'text-warning' : 'text-foreground',
+                      statusFilter === 'deleting' && 'bg-warning-soft text-foreground border-warning font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.deleting')} ({deletingCount})
@@ -1653,8 +1602,8 @@ export default function DocumentManager() {
                     onClick={() => handleStatusFilterChange('failed')}
                     disabled={isRefreshing}
                     className={cn(
-                      failedCount > 0 ? 'text-red-600' : 'text-gray-500',
-                      statusFilter === 'failed' && 'bg-red-100 dark:bg-red-900/30 font-medium border border-red-400 dark:border-red-600 shadow-sm'
+                      failedCount > 0 ? 'text-danger' : 'text-foreground',
+                      statusFilter === 'failed' && 'bg-danger-soft text-foreground border-danger font-medium border shadow-surface'
                     )}
                   >
                     {t('documentPanel.documentManager.filters.failed')} ({failedCount})
@@ -1674,7 +1623,7 @@ export default function DocumentManager() {
               <div className="flex items-center gap-2">
                 <label
                   htmlFor="toggle-filename-btn"
-                  className="text-sm text-gray-500"
+                  className="text-foreground text-sm"
                 >
                   {t('documentPanel.documentManager.fileNameLabel')}
                 </label>
@@ -1683,7 +1632,7 @@ export default function DocumentManager() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowFileName(!showFileName)}
-                  className="border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="border-border hover:bg-default"
                 >
                   {showFileName
                     ? t('documentPanel.documentManager.hideButton')
@@ -1702,7 +1651,7 @@ export default function DocumentManager() {
                 role="status"
                 aria-label={t('documentPanel.documentManager.loading')}
               >
-                <RefreshCwIcon className="text-muted-foreground size-8 animate-spin" />
+                <RefreshCwIcon className="text-foreground size-8 animate-spin" />
               </div>
             )}
             {!hasLoadedDocuments && initialLoadError !== null && (
@@ -1730,14 +1679,14 @@ export default function DocumentManager() {
             )}
             {hasLoadedDocuments && pagination.total_count > 0 && (
               <div className="absolute inset-0 flex min-h-0 flex-col p-0">
-                <div className="absolute inset-[-1px] flex flex-col p-0 border rounded-md border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="border-border absolute inset-[-1px] flex flex-col overflow-hidden rounded-md border p-0">
                   <TooltipProvider>
                     <Table className="w-full">
-                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                        <TableRow className="border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)]">
+                      <TableHeader className="bg-surface-secondary sticky top-0 z-10 shadow-xs">
+                        <TableRow className="bg-surface-secondary border-b">
                           <TableHead
                             onClick={() => handleSort('id')}
-                            className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 select-none"
+                            className="hover:bg-default cursor-pointer select-none"
                           >
                             <div className="flex items-center">
                               {showFileName
@@ -1757,7 +1706,7 @@ export default function DocumentManager() {
                           <TableHead>{t('documentPanel.documentManager.columns.chunks')}</TableHead>
                           <TableHead
                             onClick={() => handleSort('created_at')}
-                            className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 select-none"
+                            className="hover:bg-default cursor-pointer select-none"
                           >
                             <div className="flex items-center">
                               {t('documentPanel.documentManager.columns.created')}
@@ -1770,7 +1719,7 @@ export default function DocumentManager() {
                           </TableHead>
                           <TableHead
                             onClick={() => handleSort('updated_at')}
-                            className="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800 select-none"
+                            className="hover:bg-default cursor-pointer select-none"
                           >
                             <div className="flex items-center">
                               {t('documentPanel.documentManager.columns.updated')}
@@ -1802,7 +1751,7 @@ export default function DocumentManager() {
                                       {doc.file_path}
                                     </TooltipContent>
                                   </Tooltip>
-                                  <div className="text-xs text-gray-500">{doc.id}</div>
+                                  <div className="text-foreground text-xs">{doc.id}</div>
                                 </>
                               ) : (
                                 <Tooltip>

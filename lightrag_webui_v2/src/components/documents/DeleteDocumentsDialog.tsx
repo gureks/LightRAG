@@ -10,6 +10,7 @@ import {
   DialogFooter
 } from '@/components/ui/Dialog'
 import Input from '@/components/ui/Input'
+import Checkbox from '@/components/ui/Checkbox'
 import { toast } from 'sonner'
 import { errorMessage } from '@/lib/utils'
 import { deleteDocuments } from '@/api/lightrag'
@@ -146,29 +147,25 @@ export default function DeleteDocumentsDialog({ selectedDocIds, onDocumentsDelet
           </div>
 
           <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="delete-file"
               checked={deleteFile}
-              onChange={(e) => setDeleteFile(e.target.checked)}
+              onCheckedChange={(checked) => setDeleteFile(checked === true)}
               disabled={isDeleting}
-              className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
             />
-            <Label htmlFor="delete-file" className="text-sm font-medium cursor-pointer">
+            <Label htmlFor="delete-file" className="text-foreground text-sm font-medium cursor-pointer">
               {t('documentPanel.deleteDocuments.deleteFileOption')}
             </Label>
           </div>
 
           <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="delete-llm-cache"
               checked={deleteLLMCache}
-              onChange={(e) => setDeleteLLMCache(e.target.checked)}
+              onCheckedChange={(checked) => setDeleteLLMCache(checked === true)}
               disabled={isDeleting}
-              className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
             />
-            <Label htmlFor="delete-llm-cache" className="text-sm font-medium cursor-pointer">
+            <Label htmlFor="delete-llm-cache" className="text-foreground text-sm font-medium cursor-pointer">
               {t('documentPanel.deleteDocuments.deleteLLMCacheOption')}
             </Label>
           </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useKosPlatformStore, type ConflictItem } from '@/stores/kosPlatform'
-import { Drawer, Chip } from '@heroui/react'
+import { Drawer, Chip, ToggleButton, ToggleButtonGroup, Surface } from '@heroui/react'
 import {
   Table,
   TableBody,
@@ -85,27 +85,28 @@ export default function ConflictAuditView() {
           <h1 className="text-xl font-bold tracking-tight">
             Conflict & Contradiction Audit
           </h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-foreground text-sm">
             Ingest-time semantic & temporal discrepancy ledger. Click any row to inspect provenance claims and resolve authority in the side drawer.
           </p>
         </div>
 
-        <div className="border-border bg-secondary/40 flex items-center gap-1 rounded-md border p-1">
-          {(['all', 'unresolved', 'resolved'] as const).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => setStatusFilter(filter)}
-              className={`rounded px-3 py-1 text-xs font-medium capitalize transition-colors cursor-pointer ${
-                statusFilter === filter
-                  ? 'bg-background text-foreground shadow-2xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
+        <ToggleButtonGroup
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set([statusFilter])}
+          onSelectionChange={(keys) => {
+            const first = Array.from(keys)[0] as 'all' | 'unresolved' | 'resolved' | undefined
+            if (first) setStatusFilter(first)
+          }}
+          size="sm"
+        >
+          {(['all', 'unresolved', 'resolved'] as const).map((filter, idx) => (
+            <ToggleButton key={filter} id={filter} className="text-foreground text-xs capitalize">
+              {idx > 0 && <ToggleButtonGroup.Separator />}
               {filter}
-            </button>
+            </ToggleButton>
           ))}
-        </div>
+        </ToggleButtonGroup>
       </div>
 
       {/* Tabular Discrepancy List */}
@@ -159,13 +160,13 @@ export default function ConflictAuditView() {
                             {item.entityType}
                           </Badge>
                         </div>
-                        <span className="text-muted-foreground text-xs">{item.topic}</span>
+                        <span className="text-foreground text-xs">{item.topic}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-0.5 text-xs">
                         <span className="truncate font-medium">A: {item.claimA.sourceDoc}</span>
-                        <span className="text-muted-foreground truncate">
+                        <span className="text-foreground truncate">
                           B: {item.claimB.sourceDoc}
                         </span>
                       </div>
@@ -218,32 +219,32 @@ export default function ConflictAuditView() {
                       {selectedConflict.id} · {selectedConflict.entity}
                     </Drawer.Heading>
                   </div>
-                  <p className="text-muted-foreground mt-1 text-xs">
+                  <p className="text-foreground mt-1 text-xs">
                     {selectedConflict.topic} · Detected {selectedConflict.detectedAt}
                   </p>
                 </Drawer.Header>
 
                 <Drawer.Body className="flex flex-col gap-5 py-4">
                   {/* AI Scoring & Analysis */}
-                  <div className="border-border bg-secondary/30 rounded-lg border p-3.5">
+                  <Surface variant="secondary" className="border-border rounded-2xl border p-3.5">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                      <span className="text-foreground flex items-center gap-1.5 text-xs font-semibold">
                         <AlertTriangleIcon className="size-4" />
                         AI Contradiction Score:{' '}
                         {(selectedConflict.contradictionScore * 100).toFixed(0)}%
                       </span>
                       {renderStatusChip(selectedConflict.status)}
                     </div>
-                    <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+                    <p className="text-foreground mt-2 text-xs leading-relaxed">
                       {selectedConflict.aiReasoning}
                     </p>
-                  </div>
+                  </Surface>
 
                   {/* Claim A Card */}
                   <div className="border-border bg-card flex flex-col gap-2.5 rounded-lg border p-4">
                     <div className="flex items-center justify-between">
                       <Badge variant="default">Claim A</Badge>
-                      <span className="text-muted-foreground text-xs tabular-nums">
+                      <span className="text-foreground text-xs tabular-nums">
                         Extraction Confidence:{' '}
                         <strong className="text-foreground">
                           {(selectedConflict.claimA.confidence * 100).toFixed(0)}%
@@ -253,7 +254,7 @@ export default function ConflictAuditView() {
                     <p className="text-foreground text-sm font-medium leading-relaxed">
                       “{selectedConflict.claimA.statement}”
                     </p>
-                    <div className="text-muted-foreground flex flex-wrap items-center gap-4 pt-1 text-xs">
+                    <div className="text-foreground flex flex-wrap items-center gap-4 pt-1 text-xs">
                       <span className="flex items-center gap-1">
                         <FileTextIcon className="size-3.5" />
                         {selectedConflict.claimA.sourceDoc}
@@ -292,7 +293,7 @@ export default function ConflictAuditView() {
                   <div className="border-border bg-card flex flex-col gap-2.5 rounded-lg border p-4">
                     <div className="flex items-center justify-between">
                       <Badge variant="secondary">Claim B</Badge>
-                      <span className="text-muted-foreground text-xs tabular-nums">
+                      <span className="text-foreground text-xs tabular-nums">
                         Extraction Confidence:{' '}
                         <strong className="text-foreground">
                           {(selectedConflict.claimB.confidence * 100).toFixed(0)}%
@@ -302,7 +303,7 @@ export default function ConflictAuditView() {
                     <p className="text-foreground text-sm font-medium leading-relaxed">
                       “{selectedConflict.claimB.statement}”
                     </p>
-                    <div className="text-muted-foreground flex flex-wrap items-center gap-4 pt-1 text-xs">
+                    <div className="text-foreground flex flex-wrap items-center gap-4 pt-1 text-xs">
                       <span className="flex items-center gap-1">
                         <FileTextIcon className="size-3.5" />
                         {selectedConflict.claimB.sourceDoc}

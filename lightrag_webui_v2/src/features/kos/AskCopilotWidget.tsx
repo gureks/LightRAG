@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ToggleButton, ToggleButtonGroup, Surface } from '@heroui/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -122,7 +123,7 @@ export default function AskCopilotWidget() {
               </div>
               <div>
                 <CardTitle className="text-sm font-semibold">Ask Uncode</CardTitle>
-                <span className="text-muted-foreground block text-[10px]">
+                <span className="text-foreground block text-[10px]">
                   CopilotSDK • Browser & Workspace Companion
                 </span>
               </div>
@@ -139,32 +140,29 @@ export default function AskCopilotWidget() {
           </CardHeader>
 
           {/* Source Grounding Toggle ("Refer only current page" vs "Refer existing sources") */}
-          <div className="border-border bg-muted/30 flex items-center justify-between gap-1 border-b px-3 py-2">
-            <button
-              type="button"
-              onClick={() => setScope('current-page')}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                scope === 'current-page'
-                  ? 'bg-background text-foreground border-border border shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+          <Surface variant="secondary" className="border-border border-b px-3 py-2">
+            <ToggleButtonGroup
+              fullWidth
+              selectionMode="single"
+              disallowEmptySelection
+              selectedKeys={new Set([scope])}
+              onSelectionChange={(keys) => {
+                const first = Array.from(keys)[0] as 'current-page' | 'existing-sources' | undefined
+                if (first) setScope(first)
+              }}
+              size="sm"
             >
-              <GlobeIcon className="size-3" />
-              Refer only current page
-            </button>
-            <button
-              type="button"
-              onClick={() => setScope('existing-sources')}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                scope === 'existing-sources'
-                  ? 'bg-background text-foreground border-border border shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <DatabaseIcon className="size-3" />
-              Refer existing sources
-            </button>
-          </div>
+              <ToggleButton id="current-page" className="text-foreground gap-1.5 text-[11px]">
+                <GlobeIcon className="size-3" />
+                Refer only current page
+              </ToggleButton>
+              <ToggleButton id="existing-sources" className="text-foreground gap-1.5 text-[11px]">
+                <ToggleButtonGroup.Separator />
+                <DatabaseIcon className="size-3" />
+                Refer existing sources
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Surface>
 
           <CardContent className="flex flex-1 flex-col justify-between overflow-hidden p-0">
             <div className="flex-1 space-y-3 overflow-y-auto p-3.5">
@@ -174,21 +172,20 @@ export default function AskCopilotWidget() {
                   className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[88%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'border-border bg-card text-foreground border'
+                    className={`max-w-[88%] rounded-lg px-3 py-2 text-xs leading-relaxed ${msg.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'border-border bg-card text-foreground border'
                     }`}
                   >
                     {msg.content}
                   </div>
-                  <span className="text-muted-foreground mt-1 px-1 text-[10px]">
+                  <span className="text-foreground mt-1 px-1 text-[10px]">
                     {msg.scope === 'current-page' ? 'Current page context' : 'Workspace sources'}
                   </span>
                 </div>
               ))}
               {isLoading && (
-                <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                <div className="text-foreground flex items-center gap-2 text-xs">
                   <Loader2Icon className="size-3.5 animate-spin" />
                   Synthesizing response...
                 </div>
