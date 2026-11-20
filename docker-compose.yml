@@ -5,9 +5,11 @@ services:
     shm_size: 1gb
     ports:
       - "${ALLOYDB_HOST_PORT:-5432}:5432"
+    env_file:
+      - ./.env
     environment:
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-Zzt&T:5%7BvGe>9q}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       POSTGRES_DB: "${POSTGRES_DATABASE:-postgres}"
     volumes:
       - ./data/alloydb:/var/lib/postgresql/data
@@ -140,11 +142,13 @@ services:
     image: grafana/grafana:11.3.1
     container_name: uncode-grafana
     profiles: ["observability"]
+    env_file:
+      - ./.env
     ports:
       - "${GRAFANA_PORT:-3000}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
-      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-uncode-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set in .env}"
       GF_SERVER_ROOT_URL: "http://grafana.uncode.local"
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -159,15 +163,29 @@ services:
     image: langfuse/langfuse:2
     container_name: uncode-langfuse
     profiles: ["observability"]
+    env_file:
+      - ./.env
     ports:
       - "${LANGFUSE_PORT:-3001}:3000"
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-Zzt&T:5%7BvGe>9q}@alloydb:5432/langfuse"
+      PORT: "3000"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
       NEXTAUTH_URL: "${LANGFUSE_NEXTAUTH_URL:-http://langfuse.uncode.local}"
-      NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET:-uncode-langfuse-nextauth-secret-change-me}"
-      SALT: "${LANGFUSE_SALT:-uncode-langfuse-salt-change-me}"
-      ENCRYPTION_KEY: "${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}"
+      NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET:?LANGFUSE_NEXTAUTH_SECRET must be set in .env}"
+      SALT: "${LANGFUSE_SALT:?LANGFUSE_SALT must be set in .env}"
+      ENCRYPTION_KEY: "${LANGFUSE_ENCRYPTION_KEY:?LANGFUSE_ENCRYPTION_KEY must be set in .env}"
       TELEMETRY_ENABLED: "false"
+    entrypoint:
+      - node
+      - -e
+      - |
+        const { spawnSync } = require("child_process");
+        const u = encodeURIComponent(process.env.POSTGRES_USER || "postgres");
+        const p = encodeURIComponent(process.env.POSTGRES_PASSWORD || "");
+        process.env.DATABASE_URL = process.env.LANGFUSE_DATABASE_URL || `postgresql://$${u}:$${p}@alloydb:5432/langfuse`;
+        const res = spawnSync("dumb-init", ["--", "./web/entrypoint.sh", "node", "./web/server.js", "--keepAliveTimeout", "110000"], { stdio: "inherit", env: process.env });
+        process.exit(res.status ?? 1);
     depends_on:
       alloydb:
         condition: service_healthy
