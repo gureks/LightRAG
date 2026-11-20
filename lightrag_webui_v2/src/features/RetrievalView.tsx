@@ -53,7 +53,7 @@ export default function RetrievalView() {
   const queryMode = useQuerySettingsStore((s) => s.querySettings.mode)
   const agents = useKosPlatformStore((s) => s.agents)
   const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0]?.id || 'ag-1')
-  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false)
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(true)
   const [isSubgraphDrawerOpen, setIsSubgraphDrawerOpen] = useState(false)
   const [activeCitation, setActiveCitation] = useState<CitationSourceItem>(DEFAULT_CITATIONS[0])
 
@@ -168,13 +168,13 @@ export default function RetrievalView() {
 
             <Button
               size="sm"
-              variant="outline"
+              variant={isSettingsDrawerOpen ? 'default' : 'outline'}
               className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={() => setIsSettingsDrawerOpen(true)}
-              aria-label="Open Chat Settings Drawer"
+              onClick={() => setIsSettingsDrawerOpen((prev) => !prev)}
+              aria-label="Toggle Chat Parameters Panel"
             >
               <SettingsIcon className="size-3.5" />
-              <span>Settings</span>
+              <span>Parameters</span>
             </Button>
           </div>
         </div>
@@ -237,25 +237,15 @@ export default function RetrievalView() {
         />
       </div>
 
-      {/* Progressive Disclosure Drawer 1: Engine & Persona Query Settings */}
-      <Drawer.Backdrop isOpen={isSettingsDrawerOpen} onOpenChange={setIsSettingsDrawerOpen}>
-        <Drawer.Content placement="right">
-          <Drawer.Dialog className="border-border bg-background text-foreground w-full max-w-md border-l shadow-lg">
-            <Drawer.CloseTrigger />
-            <Drawer.Header className="border-border border-b pb-3">
-              <Drawer.Heading className="text-base font-semibold">
-                Retrieval & Engine Settings
-              </Drawer.Heading>
-              <p className="text-foreground text-xs">
-                Configure hybrid graph traversal parameters, reranking, and system prompt steering.
-              </p>
-            </Drawer.Header>
-            <Drawer.Body className="flex-1 overflow-y-auto py-4">
-              <QuerySettings />
-            </Drawer.Body>
-          </Drawer.Dialog>
-        </Drawer.Content>
-      </Drawer.Backdrop>
+      {/* Right-Side Retrieval Parameters Panel (matches original WebUI) */}
+      {isSettingsDrawerOpen && (
+        <aside
+          aria-label="Retrieval Parameters"
+          className="h-full overflow-y-auto shrink-0"
+        >
+          <QuerySettings />
+        </aside>
+      )}
 
       {/* Progressive Disclosure Drawer 2: Cited Sources Sub-Graph Inspector */}
       <Drawer.Backdrop isOpen={isSubgraphDrawerOpen} onOpenChange={setIsSubgraphDrawerOpen}>

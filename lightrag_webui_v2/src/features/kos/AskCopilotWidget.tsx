@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import { queryText } from '@/api/lightrag'
+import { useQuerySettingsStore } from '@/stores/querySettings'
 import { useSettingsStore } from '@/stores/settings'
 import { useKosPlatformStore } from '@/stores/kosPlatform'
 import {
@@ -75,10 +76,11 @@ export default function AskCopilotWidget() {
           }
         ])
       } else {
+        const qs = useQuerySettingsStore.getState().querySettings
         const res = await queryText({
+          ...qs,
           query: trimmed,
-          mode: 'hybrid',
-          only_need_context: false
+          stream: false,
         })
         const answer =
           res?.response?.trim() ||
