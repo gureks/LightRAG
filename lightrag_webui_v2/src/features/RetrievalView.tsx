@@ -103,7 +103,7 @@ export default function RetrievalView() {
   // margin. The resulting 32px clearance also stays above StatusIndicator.
   return (
     <div className="flex size-full gap-2 overflow-hidden px-2 pb-8">
-      <div className="flex grow flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 grow flex-col gap-3">
         {/* Top Progressive-Disclosure Chat Action Bar */}
         <div className="border-border bg-card flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 shadow-xs">
           <div className="flex flex-wrap items-center gap-2">
@@ -241,7 +241,7 @@ export default function RetrievalView() {
       {isSettingsDrawerOpen && (
         <aside
           aria-label="Retrieval Parameters"
-          className="h-full overflow-y-auto shrink-0"
+          className="flex h-full shrink-0 overflow-hidden"
         >
           <QuerySettings />
         </aside>

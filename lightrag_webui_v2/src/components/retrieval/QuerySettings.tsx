@@ -85,7 +85,7 @@ export default function QuerySettings() {
     querySettings.mode !== 'mix' && querySettings.mode !== 'bypass'
 
   return (
-    <Card className="flex shrink-0 flex-col w-[280px]">
+    <Card className="flex h-full shrink-0 flex-col w-[280px]">
       <CardHeader className="px-4 pt-4 pb-2">
         <CardTitle>{t('retrievePanel.querySettings.parametersTitle')}</CardTitle>
         <CardDescription className="sr-only">{t('retrievePanel.querySettings.parametersDescription')}</CardDescription>
@@ -124,9 +124,8 @@ export default function QuerySettings() {
           </TooltipProvider>
         </div>
       </CardHeader>
-      <CardContent className="m-0 flex grow flex-col p-0 text-xs">
-        <div className="relative size-full">
-          <div className="absolute inset-0 flex flex-col gap-2 overflow-auto px-2 pr-2">
+      <CardContent className="m-0 flex min-h-0 flex-1 flex-col p-0 text-xs">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-4">
             {/* User Prompt - Moved to top for better dropdown space */}
             <>
               <TooltipProvider>
@@ -534,7 +533,6 @@ export default function QuerySettings() {
             </>
 
           </div>
-        </div>
       </CardContent>
     </Card>
   )
