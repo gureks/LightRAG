@@ -1788,6 +1788,24 @@ def create_app(args):
     }
 
     app = FastAPI(**app_kwargs)
+
+    # Expose Prometheus /metrics when prometheus-fastapi-instrumentator is installed.
+    try:
+        from prometheus_fastapi_instrumentator import Instrumentator
+
+        Instrumentator(
+            should_group_status_codes=True,
+            should_ignore_untemplated=True,
+            excluded_handlers=["/metrics", "/health"],
+        ).instrument(
+            app,
+            metric_namespace="lightrag",
+        ).expose(app, endpoint="/metrics", include_in_schema=False)
+        logger.info("Prometheus metrics enabled at /metrics")
+    except ImportError:
+        logger.debug(
+            "prometheus-fastapi-instrumentator not installed; /metrics disabled"
+        )
     # Assigned after construction: FastAPI deprecated the ``root_path``
     # constructor argument but still applies ``app.root_path`` to every
     # request scope in ``__call__``, which the prefix routing relies on.

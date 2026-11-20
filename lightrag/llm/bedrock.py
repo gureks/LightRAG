@@ -23,6 +23,11 @@ from tenacity import (
 from collections.abc import AsyncIterator
 from typing import Any, Union
 
+from lightrag.llm.langfuse_utils import (
+    observe_generation,
+    trace_async_stream,
+    update_generation,
+)
 from lightrag.llm_roles import apply_llm_timeout
 from lightrag.utils import (
     embedding_timeout,
@@ -196,6 +201,7 @@ def _handle_bedrock_exception(e: Exception, operation: str = "Bedrock API") -> N
         | retry_if_exception_type(BedrockTimeoutError)
     ),
 )
+@observe_generation("bedrock_complete")
 async def bedrock_complete_if_cache(
     model,
     prompt,
@@ -368,6 +374,8 @@ async def bedrock_complete_if_cache(
             timeout=timeout,
         )
 
+        stream_usage: dict[str, int] = {}
+
         # Define the generator function that will manage the client lifecycle
         async def stream_generator():
             # async with ensures the aioboto3 client is closed even under
@@ -390,18 +398,20 @@ async def bedrock_complete_if_cache(
                             text = delta.get("text")
                             if text:
                                 yield text
-                        elif "metadata" in event and token_tracker is not None:
+                        elif "metadata" in event:
                             usage = event["metadata"].get("usage") or {}
                             if usage:
-                                token_tracker.add_usage(
-                                    {
-                                        "prompt_tokens": usage.get("inputTokens", 0),
-                                        "completion_tokens": usage.get(
-                                            "outputTokens", 0
-                                        ),
-                                        "total_tokens": usage.get("totalTokens", 0),
-                                    }
-                                )
+                                stream_usage["input"] = usage.get("inputTokens", 0)
+                                stream_usage["output"] = usage.get("outputTokens", 0)
+                                stream_usage["total"] = usage.get("totalTokens", 0)
+                                if token_tracker is not None:
+                                    token_tracker.add_usage(
+                                        {
+                                            "prompt_tokens": stream_usage["input"],
+                                            "completion_tokens": stream_usage["output"],
+                                            "total_tokens": stream_usage["total"],
+                                        }
+                                    )
 
                 except Exception as e:
                     # Convert to appropriate exception type
@@ -427,7 +437,14 @@ async def bedrock_complete_if_cache(
                                 )
 
         # Return the generator that manages its own lifecycle
-        return stream_generator()
+        return trace_async_stream(
+            stream_generator(),
+            name="bedrock_complete_stream",
+            model=model,
+            input_data={"system": system_prompt, "prompt": prompt},
+            usage_getter=lambda: stream_usage or None,
+            metadata={"provider": "bedrock", "stream": True},
+        )
 
     # For non-streaming responses, use the standard async context manager pattern
     session = aioboto3.Session()
@@ -530,6 +547,20 @@ async def bedrock_complete_if_cache(
                     f"(stopReason=max_tokens, content_len={len(content)}), returning partial content"
                 )
                 content = TruncatedResponse(content)
+
+            update_generation(
+                model=model,
+                input_data={"system": system_prompt, "prompt": prompt},
+                output_data=str(content),
+                usage_details={
+                    "input": usage.get("inputTokens", 0),
+                    "output": usage.get("outputTokens", 0),
+                    "total": usage.get("totalTokens", 0),
+                }
+                if usage
+                else None,
+                metadata={"provider": "bedrock", "stop_reason": stop_reason},
+            )
 
             return content
 

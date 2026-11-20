@@ -25,6 +25,11 @@ from tenacity import (
 )
 
 from lightrag.exceptions import EmptyTruncatedResponseError
+from lightrag.llm.langfuse_utils import (
+    observe_generation,
+    trace_async_stream,
+    update_generation,
+)
 from lightrag.llm_roles import apply_llm_timeout
 from lightrag.utils import (
     embedding_timeout,
@@ -345,6 +350,7 @@ def _extract_response_text(
     # still catch google.genai.errors.APIError.
     reraise=True,
 )
+@observe_generation("gemini_complete")
 async def gemini_complete_if_cache(
     model: str,
     prompt: str,
@@ -498,6 +504,7 @@ async def gemini_complete_if_cache(
         request_kwargs["config"] = config_obj
 
     if stream:
+        stream_usage: dict[str, int] = {}
 
         async def _async_stream() -> AsyncIterator[str]:
             # COT state tracking for streaming
@@ -579,22 +586,33 @@ async def gemini_complete_if_cache(
                 raise
             finally:
                 # Track token usage after streaming completes
-                if token_tracker and usage_metadata:
-                    token_tracker.add_usage(
-                        {
-                            "prompt_tokens": getattr(
-                                usage_metadata, "prompt_token_count", 0
-                            ),
-                            "completion_tokens": getattr(
-                                usage_metadata, "candidates_token_count", 0
-                            ),
-                            "total_tokens": getattr(
-                                usage_metadata, "total_token_count", 0
-                            ),
-                        }
-                    )
+                if usage_metadata:
+                    stream_usage["input"] = getattr(
+                        usage_metadata, "prompt_token_count", 0
+                    ) or 0
+                    stream_usage["output"] = getattr(
+                        usage_metadata, "candidates_token_count", 0
+                    ) or 0
+                    stream_usage["total"] = getattr(
+                        usage_metadata, "total_token_count", 0
+                    ) or 0
+                    if token_tracker:
+                        token_tracker.add_usage(
+                            {
+                                "prompt_tokens": stream_usage["input"],
+                                "completion_tokens": stream_usage["output"],
+                                "total_tokens": stream_usage["total"],
+                            }
+                        )
 
-        return _async_stream()
+        return trace_async_stream(
+            _async_stream(),
+            name="gemini_complete_stream",
+            model=model,
+            input_data={"system": system_prompt, "prompt": prompt},
+            usage_getter=lambda: stream_usage or None,
+            metadata={"provider": "gemini", "stream": True},
+        )
 
     # Non-streaming: use native async client
     response = await client.aio.models.generate_content(**request_kwargs)
@@ -706,6 +724,22 @@ async def gemini_complete_if_cache(
         final_text = TruncatedResponse(final_text)
 
     logger.debug("Gemini response length: %s", len(final_text))
+    update_generation(
+        model=model,
+        input_data={"system": system_prompt, "prompt": prompt},
+        output_data=str(final_text),
+        usage_details={
+            "input": getattr(usage, "prompt_token_count", 0) or 0,
+            "output": getattr(usage, "candidates_token_count", 0) or 0,
+            "total": getattr(usage, "total_token_count", 0) or 0,
+        }
+        if usage
+        else None,
+        metadata={
+            "provider": "gemini",
+            "finish_reason": str(getattr(finish_reason, "name", finish_reason)),
+        },
+    )
     return final_text
 
 

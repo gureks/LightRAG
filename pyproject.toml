@@ -205,6 +205,7 @@ evaluation = [
 observability = [
     # LLM observability and tracing dependencies
     "langfuse>=3.8.1",
+    "prometheus-fastapi-instrumentator>=7.0.0",
 ]
 
 [project.scripts]

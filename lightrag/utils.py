@@ -547,6 +547,21 @@ class LightragPathFilter(logging.Filter):
             return True
 
 
+class JsonLogFormatter(logging.Formatter):
+    """Structured JSON log formatter for container/Loki ingestion."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, Any] = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
 def setup_logger(
     logger_name: str,
     level: str = "INFO",
@@ -563,11 +578,16 @@ def setup_logger(
         log_file_path: Path to the log file. If None and file logging is enabled, defaults to lightrag.log in LOG_DIR or cwd
         enable_file_logging: Whether to enable logging to a file (defaults to True)
     """
+    use_json = os.getenv("LOG_FORMAT", "").strip().lower() == "json"
     # Configure formatters
-    detailed_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    simple_formatter = logging.Formatter("%(levelname)s: %(message)s")
+    if use_json:
+        detailed_formatter: logging.Formatter = JsonLogFormatter()
+        simple_formatter: logging.Formatter = JsonLogFormatter()
+    else:
+        detailed_formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        simple_formatter = logging.Formatter("%(levelname)s: %(message)s")
 
     logger_instance = logging.getLogger(logger_name)
     logger_instance.setLevel(level)
