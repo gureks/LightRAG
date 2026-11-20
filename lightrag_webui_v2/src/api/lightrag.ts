@@ -12,6 +12,8 @@ import { errorMessage } from '@/lib/utils'
 import { decodeBase64Url } from '@/lib/base64url'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/state'
+import { useKosPlatformStore } from '@/stores/kosPlatform'
+import { getFreshClerkToken } from '@/lib/clerkAuth'
 import { applyAiContentNoticeFlag } from '@/stores/aiContentNotice'
 import { navigationService } from '@/services/navigation'
 import { AuthenticationRequiredError, isAuthenticationRequiredError } from '@/api/errors'
@@ -445,8 +447,8 @@ const silentRefreshGuestToken = async (): Promise<string> => {
   return refreshTokenPromise;
 };
 
-// Interceptor: add api key and check authentication
-axiosInstance.interceptors.request.use((config) => {
+// Interceptor: add api key, workspace header, and check authentication
+axiosInstance.interceptors.request.use(async (config) => {
   // Skip interceptor for token refresh requests
   if (config.headers['X-Skip-Interceptor']) {
     delete config.headers['X-Skip-Interceptor'];
@@ -454,7 +456,8 @@ axiosInstance.interceptors.request.use((config) => {
   }
 
   const apiKey = useSettingsStore.getState().apiKey
-  const token = localStorage.getItem('LIGHTRAG-API-TOKEN');
+  const clerkToken = await getFreshClerkToken()
+  const token = clerkToken || localStorage.getItem('LIGHTRAG-API-TOKEN');
 
   // Always include token if it exists, regardless of path
   if (token) {
@@ -463,8 +466,26 @@ axiosInstance.interceptors.request.use((config) => {
   if (apiKey) {
     config.headers['X-API-Key'] = apiKey
   }
+  const activeWorkspaceId = useKosPlatformStore.getState().activeWorkspaceId
+  if (activeWorkspaceId && !config.headers['LIGHTRAG-WORKSPACE']) {
+    config.headers['LIGHTRAG-WORKSPACE'] = activeWorkspaceId
+  }
   return config
 })
+
+export interface AccessibleWorkspace {
+  id: string
+  name: string
+  role: string
+}
+
+export const getAccessibleWorkspaces = async (): Promise<{
+  active_workspace: string
+  workspaces: AccessibleWorkspace[]
+}> => {
+  const response = await axiosInstance.get('/auth/workspaces')
+  return response.data
+}
 
 // Interceptor：handle token renewal and authentication errors
 /**

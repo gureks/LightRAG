@@ -21,7 +21,7 @@ from lightrag.api.runtime_validation import validate_runtime_target_from_env_fil
 from fastapi import HTTPException, Security, Request, Response, status
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from starlette.status import HTTP_403_FORBIDDEN
-from ..utils import safe_log_value
+from ..utils import safe_log_value, tenant_id_ctx
 from lightrag.kg import deprecated_storage_message
 from lightrag.config_store import default_configuration_storage
 from .auth import auth_handler
@@ -188,6 +188,9 @@ def _renew_token_if_needed(path: str, response: Response, token_info: dict) -> N
     if not global_args.token_auto_renew:
         return
 
+    if (token_info.get("metadata") or {}).get("auth_provider") == "clerk":
+        return
+
     # Check if current path should skip token renewal
     skip_renewal = any(
         path == skip_path or path.startswith(skip_path + "/")
@@ -305,7 +308,42 @@ for path in whitelist_paths:
             whitelist_patterns.append((path, False))  # (exact_path, is_prefix_match)
 
 # Global authentication configuration
-auth_configured = bool(auth_handler.accounts)
+auth_configured = bool(auth_handler.accounts) or auth_handler.is_clerk_enabled()
+
+
+def _bind_request_tenant_context(
+    request: Request, token_info: dict | None = None
+) -> None:
+    """Resolve and bind tenant_id_ctx for the active HTTP request."""
+    import re
+
+    raw_header = request.headers.get("LIGHTRAG-WORKSPACE", "").strip()
+    requested_workspace = (
+        re.sub(r"[^a-zA-Z0-9_-]", "_", raw_header) if raw_header else None
+    )
+    token_tenant = (token_info or {}).get("tenant_id")
+    metadata = (token_info or {}).get("metadata") or {}
+    allowed_workspaces = metadata.get("allowed_workspaces") or []
+
+    if token_tenant:
+        if (
+            requested_workspace
+            and requested_workspace != token_tenant
+            and requested_workspace not in allowed_workspaces
+            and (token_info or {}).get("role") != "admin"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-tenant workspace access denied",
+            )
+        effective_tenant = requested_workspace or token_tenant
+    else:
+        effective_tenant = requested_workspace
+
+    request.state.auth_user = token_info
+    request.state.tenant_id = effective_tenant
+    if effective_tenant:
+        request.state._tenant_ctx_token = tenant_id_ctx.set(effective_tenant)
 
 
 def get_route_path(scope: Mapping[str, Any], mount_prefix: str = "") -> str:
@@ -530,6 +568,7 @@ def get_combined_auth_dependency(
                 # through so the API key stays mandatory in that mode.
                 if not auth_configured and token_info.get("role") == "guest":
                     if not api_key_configured:
+                        _bind_request_tenant_context(request, token_info)
                         _renew_token_if_needed(path, response, token_info)
                         return
                     # API-key-only mode: ignore the guest token; the X-API-Key check
@@ -537,7 +576,8 @@ def get_combined_auth_dependency(
                     # and, critically, without renewal bookkeeping: this token did
                     # not authenticate anything.
                 elif auth_configured and token_info.get("role") != "guest":
-                    # Accept non-guest token if password auth is configured
+                    # Accept non-guest token if password/Clerk auth is configured
+                    _bind_request_tenant_context(request, token_info)
                     _renew_token_if_needed(path, response, token_info)
                     return
                 else:
@@ -562,6 +602,7 @@ def get_combined_auth_dependency(
 
         # 3. Acept all request if no API protection needed
         if not auth_configured and not api_key_configured:
+            _bind_request_tenant_context(request, None)
             return
 
         # 4. Validate API key if provided and API-Key authentication is configured
@@ -574,6 +615,7 @@ def get_combined_auth_dependency(
             # with 401 until the client notices and re-fetches /auth-status.
             # Still strictly post-authorization, so no unauthenticated caller
             # reaches the bookkeeping (GHSA-3wg5-5w54-3rfm).
+            _bind_request_tenant_context(request, token_info)
             if token_info is not None:
                 _renew_token_if_needed(path, response, token_info)
             return  # API key validation successful

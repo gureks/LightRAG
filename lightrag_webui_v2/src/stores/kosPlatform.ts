@@ -104,6 +104,7 @@ interface KosPlatformState {
   workspaces: WorkspaceTenant[]
   activeWorkspaceId: string
   setActiveWorkspaceId: (id: string) => void
+  setWorkspaces: (workspaces: WorkspaceTenant[]) => void
 
   conflicts: ConflictItem[]
   resolveConflict: (
@@ -557,6 +558,14 @@ export const useKosPlatformStore = create<KosPlatformState>((set) => ({
   workspaces: INITIAL_WORKSPACES,
   activeWorkspaceId: 'space1',
   setActiveWorkspaceId: (id) => set({ activeWorkspaceId: id }),
+  setWorkspaces: (workspaces) =>
+    set((state) => ({
+      workspaces: workspaces.length > 0 ? workspaces : state.workspaces,
+      activeWorkspaceId:
+        workspaces.length > 0 && !workspaces.some((w) => w.id === state.activeWorkspaceId)
+          ? workspaces[0].id
+          : state.activeWorkspaceId
+    })),
 
   conflicts: INITIAL_CONFLICTS,
   resolveConflict: (id, resolution) =>

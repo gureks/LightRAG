@@ -74,6 +74,8 @@ from ..utils import (
     _cooperative_yield,
     get_env_value,
     performance_timing_log,
+    resolve_tenant_id,
+    tenant_id_ctx,
     validate_workspace,
     validate_workspace_override,
 )
@@ -567,6 +569,16 @@ class PostgreSQLDB:
         self.max = int(config["max_connections"])
         self.increment = 1
         self.pool: Pool | None = None
+        self.rls_enabled = os.getenv("POSTGRES_RLS_ENABLED", "true").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+        self.rls_force = os.getenv("POSTGRES_RLS_FORCE", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
 
         # SSL configuration
         self.ssl_mode = config.get("ssl_mode")
@@ -988,6 +1000,7 @@ class PostgreSQLDB:
         with_age: bool = False,
         graph_name: str | None = None,
         timing_label: str | None = None,
+        apply_rls: bool = True,
     ) -> T:
         """
         Execute a database operation with automatic retry for transient failures.
@@ -1053,6 +1066,14 @@ class PostgreSQLDB:
                         await self.configure_age(connection, graph_name)
                     elif with_age and not graph_name:
                         raise ValueError("Graph name is required when with_age is True")
+                    active_tenant = tenant_id_ctx.get() or self.workspace or "default"
+                    if self.rls_enabled and apply_rls and active_tenant:
+                        async with connection.transaction():
+                            await connection.execute(
+                                "SELECT set_config('app.current_tenant', $1, true)",
+                                active_tenant,
+                            )
+                            return await operation(connection)
                     return await operation(connection)
 
     def _get_pool_snapshot(self) -> str:
@@ -2719,6 +2740,85 @@ class PostgreSQLDB:
         except Exception as e:
             logger.error(f"PostgreSQL, LLM cache migration failed: {e}")
 
+        # Ensure multi-user workspace membership table and Row-Level Security policies
+        try:
+            await self.ensure_workspace_members_table()
+            if self.rls_enabled:
+                for table_name in (
+                    "LIGHTRAG_DOC_FULL",
+                    "LIGHTRAG_DOC_CHUNKS",
+                    "LIGHTRAG_DOC_STATUS",
+                    "LIGHTRAG_LLM_CACHE",
+                    "LIGHTRAG_FULL_ENTITIES",
+                    "LIGHTRAG_FULL_RELATIONS",
+                ):
+                    await self.ensure_rls_policy_for_table(table_name)
+        except Exception as e:
+            logger.error(f"PostgreSQL, Failed to apply RLS/workspace policies: {e}")
+
+    async def ensure_workspace_members_table(self) -> None:
+        """Create LIGHTRAG_WORKSPACE_MEMBERS table for many-users-to-one-workspace sharing."""
+        ddl = """
+        CREATE TABLE IF NOT EXISTS LIGHTRAG_WORKSPACE_MEMBERS (
+            workspace_id VARCHAR(255) NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
+            role VARCHAR(64) NOT NULL DEFAULT 'member',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (workspace_id, user_id)
+        )
+        """
+        await self.execute(ddl)
+
+    async def list_user_workspaces(self, user_id: str) -> list[dict[str, Any]]:
+        """List shared workspaces accessible to the given user_id."""
+        sql = "SELECT workspace_id, role FROM LIGHTRAG_WORKSPACE_MEMBERS WHERE user_id = $1 ORDER BY created_at ASC"
+        rows = await self.query(sql, [user_id], multirows=True)
+        return rows or []
+
+    async def add_workspace_member(
+        self, workspace_id: str, user_id: str, role: str = "member"
+    ) -> None:
+        """Grant a user_id access to a shared workspace."""
+        sql = """
+        INSERT INTO LIGHTRAG_WORKSPACE_MEMBERS (workspace_id, user_id, role)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role
+        """
+        await self.execute(sql, {"workspace_id": workspace_id, "user_id": user_id, "role": role})
+
+    async def ensure_rls_policy_for_table(self, table_name: str) -> None:
+        """Idempotently enable Postgres Row-Level Security on a workspace-partitioned table."""
+        if not self.rls_enabled:
+            return
+        safe_table = re.sub(r"[^a-zA-Z0-9_]", "", table_name)
+        if not safe_table:
+            return
+        policy_name = f"rls_tenant_{safe_table.lower()}"
+        force_sql = (
+            f"ALTER TABLE {safe_table} FORCE ROW LEVEL SECURITY;"
+            if self.rls_force
+            else ""
+        )
+        rls_sql = f"""
+        ALTER TABLE {safe_table} ENABLE ROW LEVEL SECURITY;
+        {force_sql}
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_policies
+                WHERE schemaname = current_schema()
+                  AND tablename = lower('{safe_table}')
+                  AND policyname = '{policy_name}'
+            ) THEN
+                CREATE POLICY {policy_name} ON {safe_table}
+                FOR ALL
+                USING (workspace = NULLIF(current_setting('app.current_tenant', true), ''))
+                WITH CHECK (workspace = NULLIF(current_setting('app.current_tenant', true), ''));
+            END IF;
+        END $$;
+        """
+        await self.execute(rls_sql)
+
         # Migrate doc status to add chunks_list field if needed
         try:
             await self._migrate_doc_status_add_chunks_list()
@@ -3086,6 +3186,7 @@ class PostgreSQLDB:
                 with_age=with_age,
                 graph_name=graph_name,
                 timing_label=timing_label,
+                apply_rls="CONCURRENTLY" not in sql.upper(),
             )
         except Exception as e:
             logger.error(f"PostgreSQL database, error:{e}")
@@ -3162,6 +3263,7 @@ class PostgreSQLDB:
                 with_age=with_age,
                 graph_name=graph_name,
                 timing_label=timing_label,
+                apply_rls="CONCURRENTLY" not in sql.upper(),
             )
         except Exception as e:
             logger.error(f"PostgreSQL database,\nsql:{sql},\ndata:{data},\nerror:{e}")
@@ -3478,6 +3580,12 @@ class PGKVStorage(BaseKVStorage):
             self._max_delete_records_per_batch,
         ) = _resolve_pg_batch_limits()
 
+    def _effective_workspace(self) -> str:
+        """Resolve active request tenant/workspace dynamically, falling back to self.workspace."""
+        if self.namespace == NameSpace.KV_STORE_CONFIG:
+            return CONFIG_CONTAINER_TAG
+        return resolve_tenant_id({"workspace": self.workspace})
+
     async def initialize(self):
         async with get_data_init_lock():
             if self.db is None:
@@ -3512,7 +3620,7 @@ class PGKVStorage(BaseKVStorage):
     async def get_by_id(self, id: str) -> dict[str, Any] | None:
         """Get data by id."""
         sql = SQL_TEMPLATES["get_by_id_" + self.namespace]
-        params = {"workspace": self.workspace, "id": id}
+        params = {"workspace": self._effective_workspace(), "id": id}
         response = await self.db.query(sql, list(params.values()))
 
         if response and is_namespace(self.namespace, NameSpace.KV_STORE_TEXT_CHUNKS):
@@ -3673,7 +3781,7 @@ class PGKVStorage(BaseKVStorage):
             return []
 
         sql = SQL_TEMPLATES["get_by_ids_" + self.namespace]
-        params = {"workspace": self.workspace, "ids": ids}
+        params = {"workspace": self._effective_workspace(), "ids": ids}
         results = await self.db.query(sql, list(params.values()), multirows=True)
 
         def _order_results(
@@ -3849,7 +3957,7 @@ class PGKVStorage(BaseKVStorage):
 
         table_name = namespace_to_table_name(self.namespace)
         sql = f"SELECT id FROM {table_name} WHERE workspace=$1 AND id = ANY($2)"
-        params = {"workspace": self.workspace, "ids": list(keys)}
+        params = {"workspace": self._effective_workspace(), "ids": list(keys)}
         try:
             res = await self.db.query(sql, list(params.values()), multirows=True)
             if res:
@@ -3893,7 +4001,7 @@ class PGKVStorage(BaseKVStorage):
                 #   create_time, update_time)
                 batch_values.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         v["tokens"],
                         v["chunk_order_index"],
@@ -3927,7 +4035,7 @@ class PGKVStorage(BaseKVStorage):
                         k,
                         v["content"],
                         v.get("file_path", ""),
-                        self.workspace,
+                        self._effective_workspace(),
                         v.get("sidecar_location"),
                         v.get("parse_format"),
                         v.get("content_hash"),
@@ -3944,7 +4052,7 @@ class PGKVStorage(BaseKVStorage):
                 #   chunk_id, cache_type, queryparam)
                 batch_values.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         v["original_prompt"],
                         v["return"],
@@ -3965,7 +4073,7 @@ class PGKVStorage(BaseKVStorage):
                 #   create_time, update_time)
                 batch_values.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         json.dumps(v["entity_names"]),
                         v["count"],
@@ -3983,7 +4091,7 @@ class PGKVStorage(BaseKVStorage):
                 #   create_time, update_time)
                 batch_values.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         json.dumps(v["relation_pairs"]),
                         v["count"],
@@ -4001,7 +4109,7 @@ class PGKVStorage(BaseKVStorage):
                 #   create_time, update_time)
                 batch_values.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         json.dumps(v["chunk_ids"]),
                         v["count"],
@@ -4019,7 +4127,7 @@ class PGKVStorage(BaseKVStorage):
                 #   create_time, update_time)
                 batch_values.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         json.dumps(v["chunk_ids"]),
                         v["count"],
@@ -4035,7 +4143,7 @@ class PGKVStorage(BaseKVStorage):
                 # payload travels whole in the JSONB column; the storage-managed
                 # timestamps and the ``_id`` mirror are columns, not payload.
                 batch_values.append(
-                    (self.workspace, k, json.dumps(_config_row_payload(v)))
+                    (self._effective_workspace(), k, json.dumps(_config_row_payload(v)))
                 )
                 await _cooperative_yield(i)
         else:
@@ -4133,7 +4241,7 @@ class PGKVStorage(BaseKVStorage):
         sql = f"SELECT EXISTS(SELECT 1 FROM {table_name} WHERE workspace=$1 LIMIT 1) as has_data"
 
         try:
-            result = await self.db.query(sql, [self.workspace])
+            result = await self.db.query(sql, [self._effective_workspace()])
             return not result.get("has_data", False) if result else True
         except Exception as e:
             logger.error(f"[{self.workspace}] Error checking if storage is empty: {e}")
@@ -4155,7 +4263,7 @@ class PGKVStorage(BaseKVStorage):
         last_id: str | None = None
         while True:
             id_rows = await self.db.query(
-                page_sql, [self.workspace, last_id, page_size], multirows=True
+                page_sql, [self._effective_workspace(), last_id, page_size], multirows=True
             )
             if not id_rows:
                 return
@@ -4218,7 +4326,7 @@ class PGKVStorage(BaseKVStorage):
             async with connection.transaction():
                 for i in range(0, len(ids), delete_batch_size):
                     await connection.execute(
-                        delete_sql, self.workspace, ids[i : i + delete_batch_size]
+                        delete_sql, self._effective_workspace(), ids[i : i + delete_batch_size]
                     )
 
         try:
@@ -4362,6 +4470,7 @@ class PGVectorStorage(BaseVectorStorage):
         # Make creation idempotent to handle restarts and race conditions
         ddl = ddl.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", 1)
         await db.execute(ddl)
+        await db.ensure_rls_policy_for_table(table_name)
 
         # Create indexes similar to check_tables() but with safe index names
         # Create index for id column
@@ -4881,6 +4990,12 @@ class PGVectorStorage(BaseVectorStorage):
                 "PostgreSQL: Manual deletion is required after data migration verification."
             )
 
+    def _effective_workspace(self) -> str:
+        """Resolve active request tenant/workspace dynamically, falling back to self.workspace."""
+        if self.namespace == NameSpace.KV_STORE_CONFIG:
+            return CONFIG_CONTAINER_TAG
+        return resolve_tenant_id({"workspace": self.workspace})
+
     async def initialize(self):
         async with get_data_init_lock():
             if self.db is None:
@@ -5009,7 +5124,7 @@ class PGVectorStorage(BaseVectorStorage):
             )
             # Return tuple in the exact order of SQL parameters ($1, $2, ...)
             values: tuple[Any, ...] = (
-                self.workspace,  # $1
+                self._effective_workspace(),  # $1
                 item["__id__"],  # $2
                 item["tokens"],  # $3
                 item["chunk_order_index"],  # $4
@@ -5045,7 +5160,7 @@ class PGVectorStorage(BaseVectorStorage):
 
         # Return tuple in the exact order of SQL parameters ($1, $2, ...)
         values: tuple[Any, ...] = (
-            self.workspace,  # $1
+            self._effective_workspace(),  # $1
             item["__id__"],  # $2
             item["entity_name"],  # $3
             item["content"],  # $4
@@ -5076,7 +5191,7 @@ class PGVectorStorage(BaseVectorStorage):
 
         # Return tuple in the exact order of SQL parameters ($1, $2, ...)
         values: tuple[Any, ...] = (
-            self.workspace,  # $1
+            self._effective_workspace(),  # $1
             item["__id__"],  # $2
             item["src_id"],  # $3
             item["tgt_id"],  # $4
@@ -5385,7 +5500,9 @@ class PGVectorStorage(BaseVectorStorage):
                         _ids: list[str] = id_slice,
                     ) -> None:
                         async with connection.transaction():
-                            await connection.execute(delete_sql, self.workspace, _ids)
+                            await connection.execute(
+                            delete_sql, self._effective_workspace(), _ids
+                        )
 
                     await self.db._run_with_retry(
                         _flush_delete, timing_label=timing_label
@@ -5441,7 +5558,7 @@ class PGVectorStorage(BaseVectorStorage):
         if resort:
             sql = _with_distance_resort(sql, vector_cast)
         params = {
-            "workspace": self.workspace,
+            "workspace": self._effective_workspace(),
             "closer_than_threshold": 1 - self.cosine_better_than_threshold,
             "top_k": top_k,
             "embedding": embedding,
@@ -5546,7 +5663,7 @@ class PGVectorStorage(BaseVectorStorage):
                 )
                 await self.db.execute(
                     delete_sql,
-                    {"workspace": self.workspace, "entity_name": entity_name},
+                    {"workspace": self._effective_workspace(), "entity_name": entity_name},
                 )
                 # SQL succeeded — safe to prune buffer. If it had raised,
                 # we'd skip this so the pending state remains for retry.
@@ -5624,7 +5741,7 @@ class PGVectorStorage(BaseVectorStorage):
                 )
                 await self.db.execute(
                     delete_sql,
-                    {"workspace": self.workspace, "entity_name": entity_name},
+                    {"workspace": self._effective_workspace(), "entity_name": entity_name},
                 )
                 # SQL succeeded — safe to prune pending relation docs. If
                 # it had raised, we'd skip this so the pending state
@@ -5667,7 +5784,7 @@ class PGVectorStorage(BaseVectorStorage):
             f"SELECT EXISTS(SELECT 1 FROM {self.table_name} WHERE workspace=$1) "
             f"AS has_data"
         )
-        result = await self.db.query(query, [self.workspace])
+        result = await self.db.query(query, [self._effective_workspace()])
         if not result or "has_data" not in result:
             # `SELECT EXISTS(...)` always produces exactly one row, so no row
             # means the read did not do what it claims. Raising keeps that out
@@ -5713,7 +5830,7 @@ class PGVectorStorage(BaseVectorStorage):
             f"FROM {self.table_name} WHERE workspace=$1 AND id=$2"
         )
         try:
-            result = await self.db.query(query, [self.workspace, id])
+            result = await self.db.query(query, [self._effective_workspace(), id])
             if result:
                 row = dict(result)
                 # Drop the embedding column: it is a numpy array (pgvector
@@ -5769,7 +5886,7 @@ class PGVectorStorage(BaseVectorStorage):
             )
             try:
                 results = await self.db.query(
-                    query, [self.workspace, remaining], multirows=True
+                    query, [self._effective_workspace(), remaining], multirows=True
                 )
                 for record in results or []:
                     if record is None:
@@ -5887,7 +6004,7 @@ class PGVectorStorage(BaseVectorStorage):
         )
         try:
             results = await self.db.query(
-                query, [self.workspace, remaining], multirows=True
+                query, [self._effective_workspace(), remaining], multirows=True
             )
             for row in results or []:
                 if not row or "content_vector" not in row or "id" not in row:
@@ -6173,6 +6290,12 @@ class PGDocStatusStorage(DocStatusStorage):
         # If datetime already has timezone info, keep it as is
         return dt.isoformat()
 
+    def _effective_workspace(self) -> str:
+        """Resolve active request tenant/workspace dynamically, falling back to self.workspace."""
+        if self.namespace == NameSpace.KV_STORE_CONFIG:
+            return CONFIG_CONTAINER_TAG
+        return resolve_tenant_id({"workspace": self.workspace})
+
     async def initialize(self):
         async with get_data_init_lock():
             if self.db is None:
@@ -6209,7 +6332,7 @@ class PGDocStatusStorage(DocStatusStorage):
 
         table_name = namespace_to_table_name(self.namespace)
         sql = f"SELECT id FROM {table_name} WHERE workspace=$1 AND id = ANY($2)"
-        params = {"workspace": self.workspace, "ids": list(keys)}
+        params = {"workspace": self._effective_workspace(), "ids": list(keys)}
         try:
             res = await self.db.query(sql, list(params.values()), multirows=True)
             if res:
@@ -6228,7 +6351,7 @@ class PGDocStatusStorage(DocStatusStorage):
 
     async def get_by_id(self, id: str) -> Union[dict[str, Any], None]:
         sql = "select * from LIGHTRAG_DOC_STATUS where workspace=$1 and id=$2"
-        params = {"workspace": self.workspace, "id": id}
+        params = {"workspace": self._effective_workspace(), "id": id}
         result = await self.db.query(sql, list(params.values()), True)
         if result is None or result == []:
             return None
@@ -6274,7 +6397,7 @@ class PGDocStatusStorage(DocStatusStorage):
             return []
 
         sql = "SELECT * FROM LIGHTRAG_DOC_STATUS WHERE workspace=$1 AND id = ANY($2)"
-        params = {"workspace": self.workspace, "ids": ids}
+        params = {"workspace": self._effective_workspace(), "ids": ids}
 
         results = await self.db.query(sql, list(params.values()), True)
 
@@ -6335,7 +6458,7 @@ class PGDocStatusStorage(DocStatusStorage):
             Returns the same format as get_by_id method
         """
         sql = "select * from LIGHTRAG_DOC_STATUS where workspace=$1 and file_path=$2"
-        params = {"workspace": self.workspace, "file_path": file_path}
+        params = {"workspace": self._effective_workspace(), "file_path": file_path}
         result = await self.db.query(sql, list(params.values()), True)
 
         if result is None or result == []:
@@ -6410,7 +6533,7 @@ class PGDocStatusStorage(DocStatusStorage):
             "AND COALESCE((metadata->>'is_duplicate')::boolean, false) = false "
             "ORDER BY created_at ASC, id ASC LIMIT 1"
         )
-        params = [self.workspace, basename]
+        params = [self._effective_workspace(), basename]
 
         result = await self.db.query(sql, params, True)
         if not result:
@@ -6469,7 +6592,7 @@ class PGDocStatusStorage(DocStatusStorage):
         if not content_hash:
             return None
 
-        params: list[Any] = [self.workspace, content_hash]
+        params: list[Any] = [self._effective_workspace(), content_hash]
         exclude_clause = ""
         if exclude_doc_id is not None:
             params.append(exclude_doc_id)
@@ -6555,7 +6678,7 @@ class PGDocStatusStorage(DocStatusStorage):
             f"AND {self._PRIMARY_PREDICATE} "
             "ORDER BY created_at ASC, id ASC LIMIT 2"
         )
-        rows = await self.db.query(sql, [self.workspace, canonical_source_key], True)
+        rows = await self.db.query(sql, [self._effective_workspace(), canonical_source_key], True)
         if not rows:
             return SourceAbsent()
         if len(rows) == 1:
@@ -6569,7 +6692,7 @@ class PGDocStatusStorage(DocStatusStorage):
             "SELECT COUNT(*) AS c FROM LIGHTRAG_DOC_STATUS "
             "WHERE workspace=$1 AND file_path=$2 "
             f"AND {self._PRIMARY_PREDICATE}",
-            [self.workspace, canonical_source_key],
+            [self._effective_workspace(), canonical_source_key],
         )
         candidate_count = int(count_row["c"]) if count_row else None
         return SourceConflict(
@@ -6748,7 +6871,7 @@ class PGDocStatusStorage(DocStatusStorage):
         if not statuses or position is CURSOR_END:
             return DocStatusPage(docs={}, next_position=CURSOR_END)
 
-        params: list[Any] = [self.workspace]
+        params: list[Any] = [self._effective_workspace()]
 
         # The keyset predicate is identical in every branch; build it once.
         cursor_sql = ""
@@ -6825,7 +6948,7 @@ class PGDocStatusStorage(DocStatusStorage):
             'SELECT COUNT(*) AS "count" FROM LIGHTRAG_DOC_STATUS '
             "WHERE workspace=$1 AND status = ANY($2)"
         )
-        row = await self.db.query(sql, [self.workspace, [s.value for s in statuses]])
+        row = await self.db.query(sql, [self._effective_workspace(), [s.value for s in statuses]])
         if row is None or row.get("count") is None:
             raise StorageControlPlaneError(
                 f"[{self.workspace}] COUNT query returned no row for "
@@ -6874,13 +6997,13 @@ class PGDocStatusStorage(DocStatusStorage):
             # Nothing to write; still honour the existence contract.
             row = await self.db.query(
                 "SELECT id FROM LIGHTRAG_DOC_STATUS WHERE workspace=$1 AND id=$2",
-                [self.workspace, doc_id],
+                [self._effective_workspace(), doc_id],
             )
             if row is None and not missing_ok:
                 raise StorageRecordNotFoundError(doc_id)
             return
 
-        params: list[Any] = [self.workspace, doc_id]
+        params: list[Any] = [self._effective_workspace(), doc_id]
         set_clauses: list[str] = []
         for column, value in fields.items():
             params.append(self._prepare_doc_status_field_value(column, value))
@@ -6924,7 +7047,7 @@ class PGDocStatusStorage(DocStatusStorage):
             "metadata FROM LIGHTRAG_DOC_STATUS "
             "WHERE workspace=$1 AND id = ANY($2)"
         )
-        rows = await self.db.query(sql, [self.workspace, ids], multirows=True) or []
+        rows = await self.db.query(sql, [self._effective_workspace(), ids], multirows=True) or []
         result: dict[str, DocSchedulingRecord] = {}
         for row in rows:
             record = self._pg_scheduling_record_from_row(row, strict=strict)
@@ -6956,7 +7079,7 @@ class PGDocStatusStorage(DocStatusStorage):
         if not ids:
             return {}
         sql = "SELECT * FROM LIGHTRAG_DOC_STATUS WHERE workspace=$1 AND id = ANY($2)"
-        rows = await self.db.query(sql, [self.workspace, ids], multirows=True) or []
+        rows = await self.db.query(sql, [self._effective_workspace(), ids], multirows=True) or []
         result: dict[str, DocProcessingStatus] = {}
         for element in rows:
             try:
@@ -7015,7 +7138,7 @@ class PGDocStatusStorage(DocStatusStorage):
             raise ValueError(f"page limit must be positive, got {limit}")
         if position is CURSOR_END:
             return SourceConflictPage(conflicts=(), next_position=CURSOR_END)
-        params: list[Any] = [self.workspace]
+        params: list[Any] = [self._effective_workspace()]
         sql = (
             "SELECT file_path, COUNT(*) AS c FROM LIGHTRAG_DOC_STATUS "
             f"WHERE workspace=$1 AND {self._PRIMARY_PREDICATE} "
@@ -7040,7 +7163,7 @@ class PGDocStatusStorage(DocStatusStorage):
                     "SELECT id FROM LIGHTRAG_DOC_STATUS "
                     f"WHERE workspace=$1 AND file_path=$2 AND {self._PRIMARY_PREDICATE} "
                     "ORDER BY id ASC LIMIT $3",
-                    [self.workspace, key, self._CONFLICT_SAMPLE_CAP],
+                    [self._effective_workspace(), key, self._CONFLICT_SAMPLE_CAP],
                     multirows=True,
                 )
                 or []
@@ -7161,7 +7284,7 @@ class PGDocStatusStorage(DocStatusStorage):
                    FROM LIGHTRAG_DOC_STATUS
                   where workspace=$1 GROUP BY STATUS
                  """
-        params = {"workspace": self.workspace}
+        params = {"workspace": self._effective_workspace()}
         result = await self.db.query(sql, list(params.values()), True)
         counts = {}
         for doc in result:
@@ -7232,7 +7355,7 @@ class PGDocStatusStorage(DocStatusStorage):
             "SELECT * FROM LIGHTRAG_DOC_STATUS WHERE workspace=$1 AND status = ANY($2)"
         )
         result = await self.db.query(
-            sql, [self.workspace, status_values], multirows=True
+            sql, [self._effective_workspace(), status_values], multirows=True
         )
 
         docs: dict[str, DocProcessingStatus] = {}
@@ -7256,7 +7379,7 @@ class PGDocStatusStorage(DocStatusStorage):
     ) -> dict[str, DocProcessingStatus]:
         """Get all documents with a specific track_id"""
         sql = "select * from LIGHTRAG_DOC_STATUS where workspace=$1 and track_id=$2"
-        params = {"workspace": self.workspace, "track_id": track_id}
+        params = {"workspace": self._effective_workspace(), "track_id": track_id}
         result = await self.db.query(sql, list(params.values()), True)
 
         docs_by_track_id = {}
@@ -7341,7 +7464,7 @@ class PGDocStatusStorage(DocStatusStorage):
         offset = (page - 1) * page_size
 
         # Build parameterized query components
-        params = {"workspace": self.workspace}
+        params = {"workspace": self._effective_workspace()}
         param_count = 1
 
         # Build WHERE clause with parameterized query
@@ -7476,7 +7599,7 @@ class PGDocStatusStorage(DocStatusStorage):
             WHERE workspace=$1
             GROUP BY status
         """
-        params = {"workspace": self.workspace}
+        params = {"workspace": self._effective_workspace()}
         query_timing_label = (
             f"{self.workspace} PGDocStatusStorage.get_all_status_counts"
         )
@@ -7526,7 +7649,7 @@ class PGDocStatusStorage(DocStatusStorage):
         sql = f"SELECT EXISTS(SELECT 1 FROM {table_name} WHERE workspace=$1 LIMIT 1) as has_data"
 
         try:
-            result = await self.db.query(sql, [self.workspace])
+            result = await self.db.query(sql, [self._effective_workspace()])
             return not result.get("has_data", False) if result else True
         except Exception as e:
             logger.error(f"[{self.workspace}] Error checking if storage is empty: {e}")
@@ -7581,7 +7704,7 @@ class PGDocStatusStorage(DocStatusStorage):
             async with connection.transaction():
                 for i in range(0, len(ids), delete_batch_size):
                     await connection.execute(
-                        delete_sql, self.workspace, ids[i : i + delete_batch_size]
+                        delete_sql, self._effective_workspace(), ids[i : i + delete_batch_size]
                     )
 
         try:
@@ -7655,7 +7778,7 @@ class PGDocStatusStorage(DocStatusStorage):
             try:
                 batch.append(
                     (
-                        self.workspace,
+                        self._effective_workspace(),
                         k,
                         v["content_summary"],
                         v["content_length"],
@@ -8062,6 +8185,12 @@ class PGGraphStorage(BaseGraphStorage):
         # Escape double quotes
         normalized_id = normalized_id.replace('"', '\\"')
         return normalized_id
+
+    def _effective_workspace(self) -> str:
+        """Resolve active request tenant/workspace dynamically, falling back to self.workspace."""
+        if self.namespace == NameSpace.KV_STORE_CONFIG:
+            return CONFIG_CONTAINER_TAG
+        return resolve_tenant_id({"workspace": self.workspace})
 
     async def initialize(self):
         async with get_data_init_lock():

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { SignIn, useAuth } from '@clerk/react'
+import { isClerkConfigured, registerClerkTokenGetter } from '@/lib/clerkAuth'
 import { useAuthStore } from '@/stores/state'
 import { activateLoginIdentityFromToken } from '@/lib/loginIdentity'
 import { markVersionCheckedFromLogin } from '@/lib/versionCheckCache'
@@ -42,11 +44,43 @@ interface LoginPageProps {
   autoActivateGuest?: boolean
 }
 
+const ClerkSignInBridge = ({ onSuccess }: { onSuccess: (token: string) => void }) => {
+  const { isLoaded, isSignedIn, getToken, orgId } = useAuth()
+
+  useEffect(() => {
+    registerClerkTokenGetter(() => getToken())
+  }, [getToken])
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+    let cancelled = false
+    getToken().then((token) => {
+      if (!cancelled && token) {
+        onSuccess(token)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoaded, isSignedIn, getToken, orgId, onSuccess])
+
+  if (!isLoaded) {
+    return <div className="py-6 text-center text-sm text-muted-foreground">Loading Clerk sign-in...</div>
+  }
+
+  return (
+    <div className="flex justify-center">
+      <SignIn routing="hash" />
+    </div>
+  )
+}
+
 const LoginPage = ({ autoActivateGuest = true }: LoginPageProps) => {
   const navigate = useNavigate()
   const { login, isAuthenticated } = useAuthStore()
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
+  const [showLocalForm, setShowLocalForm] = useState(!isClerkConfigured())
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -289,6 +323,26 @@ const LoginPage = ({ autoActivateGuest = true }: LoginPageProps) => {
                 className="mb-6 text-sm"
               />
             )}
+            {isClerkConfigured() && !showLocalForm ? (
+              <div className="space-y-4">
+                <ClerkSignInBridge
+                  onSuccess={(clerkToken) => {
+                    localStorage.setItem('LIGHTRAG-API-TOKEN', clerkToken)
+                    login(clerkToken, false)
+                    navigate('/')
+                  }}
+                />
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowLocalForm(true)}
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                  >
+                    Use local admin credentials instead
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="flex items-center gap-4">
                 <label htmlFor="username-input" className="text-sm font-medium w-16 shrink-0">
@@ -365,7 +419,19 @@ const LoginPage = ({ autoActivateGuest = true }: LoginPageProps) => {
               >
                 {loading ? t('login.loggingIn') : t('login.loginButton')}
               </Button>
+              {isClerkConfigured() && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowLocalForm(false)}
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                  >
+                    Sign in with Clerk instead
+                  </button>
+                </div>
+              )}
             </form>
+            )}
           </CardContent>
         </Card>
       </div>

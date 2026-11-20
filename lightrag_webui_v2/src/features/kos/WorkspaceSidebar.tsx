@@ -27,7 +27,16 @@ import {
   PanelLeftCloseIcon,
   PanelLeftOpenIcon
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import {
+  OrganizationSwitcher,
+  useAuth,
+  useOrganization,
+  useOrganizationList
+} from '@clerk/react'
+import { isClerkConfigured, registerClerkTokenGetter } from '@/lib/clerkAuth'
+import { getAccessibleWorkspaces } from '@/api/lightrag'
+import { useAuthStore } from '@/stores/state'
 
 interface NavItem {
   id: Tab
@@ -37,18 +46,120 @@ interface NavItem {
   badge?: number
 }
 
+function ClerkWorkspaceSwitcher() {
+  const { getToken, userId } = useAuth()
+  const { organization } = useOrganization()
+  const { userMemberships, isLoaded } = useOrganizationList({ userMemberships: true })
+  const setWorkspaces = useKosPlatformStore((s) => s.setWorkspaces)
+  const setActiveWorkspaceId = useKosPlatformStore((s) => s.setActiveWorkspaceId)
+
+  useEffect(() => {
+    registerClerkTokenGetter(() => getToken())
+  }, [getToken])
+
+  useEffect(() => {
+    if (!isLoaded) return
+    const items = (userMemberships?.data ?? []).map((mem) => ({
+      id: mem.organization.id,
+      name: mem.organization.name,
+      environment: 'Production' as const,
+      docCount: 0,
+      entityCount: 0,
+      edgeCount: 0,
+      queriesUsed: 0,
+      queriesLimit: 10000,
+      tokensUsedM: 0,
+      tokensLimitM: 50
+    }))
+    if (userId) {
+      items.unshift({
+        id: `user_${userId}`,
+        name: 'Personal Workspace',
+        environment: 'Production',
+        docCount: 0,
+        entityCount: 0,
+        edgeCount: 0,
+        queriesUsed: 0,
+        queriesLimit: 10000,
+        tokensUsedM: 0,
+        tokensLimitM: 50
+      })
+    }
+    if (items.length > 0) {
+      setWorkspaces(items)
+    }
+  }, [isLoaded, userMemberships?.data, userId, setWorkspaces])
+
+  useEffect(() => {
+    if (organization?.id) {
+      setActiveWorkspaceId(organization.id)
+    } else if (userId) {
+      setActiveWorkspaceId(`user_${userId}`)
+    }
+  }, [organization?.id, userId, setActiveWorkspaceId])
+
+  return (
+    <div className="min-w-0 flex-1 overflow-hidden">
+      <OrganizationSwitcher
+        hidePersonal={false}
+        appearance={{
+          elements: {
+            rootBox: 'w-full',
+            organizationSwitcherTrigger:
+              'w-full justify-between h-9 border border-border bg-secondary/40 px-2.5 text-xs font-semibold rounded-md'
+          }
+        }}
+      />
+    </div>
+  )
+}
+
 export default function WorkspaceSidebar() {
   const currentTab = useSettingsStore.use.currentTab()
   const setCurrentTab = useSettingsStore.use.setCurrentTab()
   const theme = useSettingsStore.use.theme()
   const setTheme = useSettingsStore.use.setTheme()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   const workspaces = useKosPlatformStore((s) => s.workspaces)
   const activeWorkspaceId = useKosPlatformStore((s) => s.activeWorkspaceId)
   const setActiveWorkspaceId = useKosPlatformStore((s) => s.setActiveWorkspaceId)
+  const setWorkspaces = useKosPlatformStore((s) => s.setWorkspaces)
   const conflicts = useKosPlatformStore((s) => s.conflicts)
 
   const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    if (isClerkConfigured() || !isAuthenticated) return
+    let cancelled = false
+    getAccessibleWorkspaces()
+      .then((res) => {
+        if (cancelled || !res?.workspaces?.length) return
+        setWorkspaces(
+          res.workspaces.map((ws) => ({
+            id: ws.id,
+            name: ws.name,
+            environment: 'Production',
+            docCount: 0,
+            entityCount: 0,
+            edgeCount: 0,
+            queriesUsed: 0,
+            queriesLimit: 10000,
+            tokensUsedM: 0,
+            tokensLimitM: 50
+          }))
+        )
+        if (res.active_workspace) {
+          setActiveWorkspaceId(res.active_workspace)
+        }
+      })
+      .catch(() => {
+        // Offline / unit-test fallback: retain store workspaces
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, setWorkspaces, setActiveWorkspaceId])
 
   const activeWorkspace =
     workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0]
@@ -88,6 +199,9 @@ export default function WorkspaceSidebar() {
       <div className="flex flex-col gap-2 p-2.5">
         <div className="flex items-center justify-between gap-1.5">
           {!collapsed && (
+            isClerkConfigured() ? (
+              <ClerkWorkspaceSwitcher />
+            ) : (
             <div className="min-w-0 flex-1">
               <Select value={activeWorkspaceId} onValueChange={setActiveWorkspaceId}>
                 <SelectTrigger
@@ -105,6 +219,7 @@ export default function WorkspaceSidebar() {
                 </SelectContent>
               </Select>
             </div>
+            )
           )}
           <Button
             variant="ghost"

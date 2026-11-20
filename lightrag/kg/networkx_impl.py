@@ -13,6 +13,7 @@ from lightrag.utils import (
     commit_in_storage_io,
     log_without_raising,
     logger,
+    tenant_id_ctx,
     validate_workspace,
     validate_xml_attributes,
 )
@@ -788,13 +789,27 @@ class NetworkXStorage(BaseGraphStorage):
         graph = await self._get_graph()
         return graph.has_edge(source_node_id, target_node_id)
 
+    def _matches_active_tenant(self, attrs: dict | None) -> bool:
+        """Enforce tenant_id_ctx isolation on graph reads when a tenant context is active."""
+        if attrs is None:
+            return False
+        active_tenant = tenant_id_ctx.get()
+        if not active_tenant:
+            return True
+        record_tenant = attrs.get("tenant_id")
+        if record_tenant is None:
+            return active_tenant == (self.workspace or "default")
+        return record_tenant == active_tenant
+
     async def get_node(self, node_id: str) -> dict[str, str] | None:
         graph = await self._get_graph()
         node = graph.nodes.get(node_id)
+        if node is None or not self._matches_active_tenant(node):
+            return None
         # Shallow-copy so callers cannot mutate the live NetworkX attr dict
         # (same class as JsonKV/JsonDocStatus copy-on-read). get_all_nodes
         # already copies; get_node/get_edge must match.
-        return dict(node) if node is not None else None
+        return dict(node)
 
     async def node_degree(self, node_id: str) -> int:
         graph = await self._get_graph()
@@ -813,12 +828,20 @@ class NetworkXStorage(BaseGraphStorage):
     ) -> dict[str, str] | None:
         graph = await self._get_graph()
         edge = graph.edges.get((source_node_id, target_node_id))
-        return dict(edge) if edge is not None else None
+        if edge is None or not self._matches_active_tenant(edge):
+            return None
+        return dict(edge)
 
     async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
         graph = await self._get_graph()
-        if graph.has_node(source_node_id):
-            return list(graph.edges(source_node_id))
+        if graph.has_node(source_node_id) and self._matches_active_tenant(
+            graph.nodes.get(source_node_id)
+        ):
+            return [
+                (u, v)
+                for u, v, edge_data in graph.edges(source_node_id, data=True)
+                if self._matches_active_tenant(edge_data)
+            ]
         return None
 
     async def upsert_node(self, node_id: str, node_data: dict[str, str]) -> None:
@@ -1330,6 +1353,8 @@ class NetworkXStorage(BaseGraphStorage):
         graph = await self._get_graph()
         all_nodes = []
         for node_id, node_data in graph.nodes(data=True):
+            if not self._matches_active_tenant(node_data):
+                continue
             node_data_with_id = node_data.copy()
             node_data_with_id["id"] = node_id
             all_nodes.append(node_data_with_id)
@@ -1344,6 +1369,8 @@ class NetworkXStorage(BaseGraphStorage):
         graph = await self._get_graph()
         all_edges = []
         for u, v, edge_data in graph.edges(data=True):
+            if not self._matches_active_tenant(edge_data):
+                continue
             edge_data_with_nodes = edge_data.copy()
             edge_data_with_nodes["source"] = u
             edge_data_with_nodes["target"] = v

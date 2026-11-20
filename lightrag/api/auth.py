@@ -1,6 +1,8 @@
+import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from jwt import PyJWKClient
 from dotenv import load_dotenv
 from fastapi import HTTPException, status
 from pydantic import BaseModel
@@ -44,7 +46,111 @@ class TokenPayload(BaseModel):
     sub: str  # Username
     exp: datetime  # Expiration time
     role: str = "user"  # User role, default is regular user
+    tenant_id: str | None = None  # Active tenant / workspace identifier
     metadata: dict = {}  # Additional metadata
+
+
+class ClerkJWKSValidator:
+    """Stateless RS256 JWT verifier for Clerk (JWKS or networkless PEM key on Cloud Run)."""
+
+    def __init__(self):
+        self.provider = os.getenv("AUTH_PROVIDER", "local").strip().lower()
+        self.issuer = os.getenv("CLERK_ISSUER", "").strip().rstrip("/") or None
+        self.jwks_url = os.getenv("CLERK_JWKS_URL", "").strip() or (
+            f"{self.issuer}/.well-known/jwks.json" if self.issuer else None
+        )
+        self.jwt_key = os.getenv("CLERK_JWT_KEY", "").strip() or None
+        if self.jwt_key and "\\n" in self.jwt_key:
+            self.jwt_key = self.jwt_key.replace("\\n", "\n")
+        self.audience = os.getenv("CLERK_AUDIENCE", "").strip() or None
+        azp_raw = os.getenv("CLERK_AUTHORIZED_PARTIES", "").strip()
+        self.authorized_parties = [
+            p.strip() for p in azp_raw.split(",") if p.strip()
+        ]
+        self._jwk_client: PyJWKClient | None = None
+
+    @property
+    def enabled(self) -> bool:
+        return self.provider == "clerk" or bool(self.jwks_url or self.jwt_key)
+
+    def _get_jwk_client(self) -> PyJWKClient:
+        if self._jwk_client is None:
+            if not self.jwks_url:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="CLERK_JWKS_URL or CLERK_ISSUER must be configured for Clerk JWT verification.",
+                )
+            self._jwk_client = PyJWKClient(self.jwks_url, cache_keys=True, lifespan=3600)
+        return self._jwk_client
+
+    def verify(self, token: str) -> dict:
+        """Verify a Clerk session JWT and normalize claims into LightRAG token_info."""
+        try:
+            key = self.jwt_key
+            if not key:
+                signing_key = self._get_jwk_client().get_signing_key_from_jwt(token)
+                key = signing_key.key
+
+            decode_kwargs: dict = {
+                "algorithms": ["RS256"],
+                "options": {"verify_aud": bool(self.audience)},
+            }
+            if self.audience:
+                decode_kwargs["audience"] = self.audience
+            if self.issuer:
+                decode_kwargs["issuer"] = self.issuer
+
+            payload = jwt.decode(token, key, **decode_kwargs)
+        except jwt.PyJWTError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Clerk token",
+            ) from exc
+
+        if self.authorized_parties:
+            azp = payload.get("azp")
+            if azp and azp not in self.authorized_parties:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized token party",
+                )
+
+        sub = payload.get("sub")
+        if not isinstance(sub, str) or not sub or len(sub) > MAX_TOKEN_SUBJECT_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token subject",
+            )
+
+        exp_ts = payload.get("exp")
+        if exp_ts is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token expiration",
+            )
+        expire_time = datetime.fromtimestamp(exp_ts, timezone.utc)
+
+        # Clerk Organizations: org_id is the shared multi-user tenant/workspace key.
+        # Falls back to explicit tenant_id claim or user-scoped workspace.
+        org_id = payload.get("org_id")
+        tenant_id = (
+            org_id
+            or payload.get("tenant_id")
+            or f"user_{sub}"
+        )
+        role = payload.get("org_role") or payload.get("role") or "user"
+        return {
+            "username": sub,
+            "role": role,
+            "tenant_id": str(tenant_id),
+            "metadata": {
+                "auth_provider": "clerk",
+                "org_id": org_id,
+                "org_slug": payload.get("org_slug"),
+                "org_permissions": payload.get("org_permissions") or [],
+            },
+            "exp": expire_time,
+        }
 
 
 class AuthHandler:
@@ -70,6 +176,7 @@ class AuthHandler:
         self.algorithm = algorithm
         self.expire_hours = global_args.token_expire_hours
         self.guest_expire_hours = global_args.guest_token_expire_hours
+        self.clerk_validator = ClerkJWKSValidator()
         self.accounts = {}
         invalid_accounts = []
         oversized_username_lengths = []
@@ -151,6 +258,7 @@ class AuthHandler:
         role: str = "user",
         custom_expire_hours: int = None,
         metadata: dict = None,
+        tenant_id: str | None = None,
     ) -> str:
         """
         Create JWT token
@@ -160,6 +268,7 @@ class AuthHandler:
             role: User role, default is "user", guest is "guest"
             custom_expire_hours: Custom expiration time (hours), if None use default value
             metadata: Additional metadata
+            tenant_id: Optional tenant / workspace identifier
 
         Returns:
             str: Encoded JWT token
@@ -177,24 +286,44 @@ class AuthHandler:
 
         # Create payload
         payload = TokenPayload(
-            sub=username, exp=expire, role=role, metadata=metadata or {}
+            sub=username,
+            exp=expire,
+            role=role,
+            tenant_id=tenant_id,
+            metadata=metadata or {},
         )
 
         return jwt.encode(payload.model_dump(), self.secret, algorithm=self.algorithm)
 
+    def is_clerk_enabled(self) -> bool:
+        """Return True when external Clerk JWKS/PEM verification is configured."""
+        return self.clerk_validator.enabled
+
     def validate_token(self, token: str) -> dict:
         """
-        Validate JWT token
+        Validate JWT token (local HS256 or Clerk RS256 JWKS when configured)
 
         Args:
             token: JWT token
 
         Returns:
-            dict: Dictionary containing user information
+            dict: Dictionary containing user information and tenant_id
 
         Raises:
             HTTPException: If token is invalid or expired
         """
+        if self.clerk_validator.enabled:
+            try:
+                header = jwt.get_unverified_header(token)
+            except jwt.PyJWTError:
+                header = {}
+            alg = str(header.get("alg", "")).upper()
+            if alg != self.algorithm.upper() or self.clerk_validator.provider == "clerk":
+                if alg == "HS256" and self.accounts and self.clerk_validator.provider != "clerk":
+                    pass
+                else:
+                    return self.clerk_validator.verify(token)
+
         try:
             # Explicitly exclude 'none' to prevent algorithm confusion attacks
             allowed_algorithms = [self.algorithm]
@@ -251,6 +380,7 @@ class AuthHandler:
             return {
                 "username": username,
                 "role": payload.get("role", "user"),
+                "tenant_id": payload.get("tenant_id"),
                 "metadata": payload.get("metadata", {}),
                 "exp": expire_time,
             }

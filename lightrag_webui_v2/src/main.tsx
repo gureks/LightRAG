@@ -4,6 +4,8 @@
 import '@/migrations/runSettingsStorageSplit'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { ClerkProvider } from '@clerk/react'
+import { CLERK_PUBLISHABLE_KEY, isClerkConfigured } from '@/lib/clerkAuth'
 import './index.css'
 import AppRouter from './AppRouter'
 import './i18n.ts';
@@ -16,6 +18,12 @@ import 'katex/contrib/copy-tex'; // Allow copying rendered formulas as LaTeX sou
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppRouter />
+    {isClerkConfigured() ? (
+      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+        <AppRouter />
+      </ClerkProvider>
+    ) : (
+      <AppRouter />
+    )}
   </StrictMode>
 )

@@ -1931,6 +1931,18 @@ def create_app(args):
     # /health can stay a public liveness probe while gating sensitive config.
     auth_status = get_auth_status_dependency(api_key)
 
+    @app.middleware("http")
+    async def reset_tenant_context_middleware(request: Request, call_next):
+        """Ensure per-request tenant_id_ctx is always reset after handling a request."""
+        from lightrag.utils import tenant_id_ctx
+
+        try:
+            return await call_next(request)
+        finally:
+            ctx_token = getattr(request.state, "_tenant_ctx_token", None)
+            if ctx_token is not None:
+                tenant_id_ctx.reset(ctx_token)
+
     def get_workspace_from_request(request: Request) -> str | None:
         """
         Extract workspace from HTTP request header or use default.
@@ -2872,14 +2884,16 @@ def create_app(args):
     @app.get("/auth-status")
     async def get_auth_status():
         """Get authentication status and guest token if auth is not configured"""
-
-        if not auth_handler.accounts:
+        clerk_enabled = auth_handler.is_clerk_enabled()
+        if not auth_handler.accounts and not clerk_enabled:
             # Authentication not configured, return guest token
             guest_token = auth_handler.create_token(
                 username="guest", role="guest", metadata={"auth_mode": "disabled"}
             )
             return {
                 "auth_configured": False,
+                "clerk_enabled": False,
+                "auth_provider": "local",
                 "access_token": guest_token,
                 "token_type": "bearer",
                 "auth_mode": "disabled",
@@ -2893,6 +2907,8 @@ def create_app(args):
 
         return {
             "auth_configured": True,
+            "clerk_enabled": clerk_enabled,
+            "auth_provider": "clerk" if clerk_enabled else "local",
             "auth_mode": "enabled",
             "core_version": core_version,
             "api_version": api_version_display,
@@ -2900,6 +2916,89 @@ def create_app(args):
             "webui_description": webui_description,
             "ai_content_notice_enabled": ai_content_notice_enabled,
         }
+
+    # In-memory fallback for multi-user workspace memberships when Postgres is not active
+    _workspace_members_fallback: dict[str, list[dict[str, str]]] = {}
+
+    @app.get("/auth/workspaces", dependencies=[Depends(combined_auth)])
+    async def list_accessible_workspaces(request: Request):
+        """Return workspaces accessible to the authenticated user/tenant."""
+        auth_user = getattr(request.state, "auth_user", None) or {}
+        username = auth_user.get("username") or "guest"
+        active_tenant = getattr(request.state, "tenant_id", None) or get_default_workspace() or "default"
+        metadata = auth_user.get("metadata") or {}
+        org_slug = metadata.get("org_slug")
+
+        workspaces: list[dict[str, str]] = [
+            {
+                "id": active_tenant,
+                "name": org_slug or active_tenant,
+                "role": str(auth_user.get("role") or "member"),
+            }
+        ]
+        seen = {active_tenant}
+
+        # Include any shared workspaces granted to this user in AlloyDB or fallback store
+        db = getattr(getattr(rag, "chunk_entity_relation_graph", None), "db", None) or getattr(
+            getattr(rag, "doc_status", None), "db", None
+        )
+        if db is not None and hasattr(db, "list_user_workspaces"):
+            try:
+                rows = await db.list_user_workspaces(username)
+                for row in rows:
+                    ws_id = row.get("workspace_id")
+                    if ws_id and ws_id not in seen:
+                        seen.add(ws_id)
+                        workspaces.append(
+                            {
+                                "id": ws_id,
+                                "name": ws_id,
+                                "role": row.get("role", "member"),
+                            }
+                        )
+            except Exception as exc:
+                logger.warning(f"Failed to query workspace memberships: {exc}")
+        else:
+            for ws_id, members in _workspace_members_fallback.items():
+                for member in members:
+                    if member.get("user_id") == username and ws_id not in seen:
+                        seen.add(ws_id)
+                        workspaces.append(
+                            {"id": ws_id, "name": ws_id, "role": member.get("role", "member")}
+                        )
+
+        return {"active_workspace": active_tenant, "workspaces": workspaces}
+
+    @app.post("/auth/workspaces/{workspace_id}/members", dependencies=[Depends(combined_auth)])
+    async def add_workspace_member(
+        workspace_id: str,
+        request: Request,
+        user_id: str,
+        role: str = "member",
+    ):
+        """Add a user/tenant to a shared workspace (many-users-to-one-workspace)."""
+        auth_user = getattr(request.state, "auth_user", None) or {}
+        active_tenant = getattr(request.state, "tenant_id", None)
+        caller_role = str(auth_user.get("role") or "")
+        if (
+            active_tenant
+            and active_tenant != workspace_id
+            and caller_role not in ("admin", "org:admin")
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Only workspace admins can add members to this workspace",
+            )
+
+        db = getattr(getattr(rag, "doc_status", None), "db", None)
+        if db is not None and hasattr(db, "add_workspace_member"):
+            await db.add_workspace_member(workspace_id, user_id, role)
+        else:
+            members = _workspace_members_fallback.setdefault(workspace_id, [])
+            if not any(m.get("user_id") == user_id for m in members):
+                members.append({"user_id": user_id, "role": role})
+
+        return {"status": "ok", "workspace_id": workspace_id, "user_id": user_id, "role": role}
 
     # Brute-force protection for /login (CWE-307): throttle failed attempts per
     # client IP + username. Checked before the bcrypt verification, so a locked
