@@ -23,7 +23,9 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV UV_SYSTEM_PYTHON=1
+ENV UV_HTTP_TIMEOUT=300
 ENV UV_COMPILE_BYTECODE=1
+ENV UV_HTTP_TIMEOUT=300
 
 WORKDIR /app
 
@@ -80,6 +82,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 ENV UV_SYSTEM_PYTHON=1
+ENV UV_HTTP_TIMEOUT=300
 
 # Copy installed packages and application code
 COPY --from=builder /root/.local /root/.local

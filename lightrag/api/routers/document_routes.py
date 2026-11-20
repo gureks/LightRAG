@@ -844,24 +844,6 @@ class InsertTextRequest(BaseModel):
             raise ValueError("text cannot be empty or whitespace-only")
         return stripped
 
-
-class InsertUrlRequest(BaseModel):
-    """Request model for crawling and inserting a web URL document."""
-
-    url: str = Field(min_length=1, description="HTTP/HTTPS URL to crawl and index")
-    chunking: Optional[TextChunkingConfig] = Field(
-        default=None,
-        description="Chunking strategy and params; omit for default fixed-token chunking",
-    )
-
-    @field_validator("url", mode="after")
-    @classmethod
-    def validate_url_scheme(cls, url: str) -> str:
-        stripped = url.strip()
-        if not stripped.startswith(("http://", "https://")):
-            raise ValueError("url must start with http:// or https://")
-        return stripped
-
     @field_validator("file_source", mode="before")
     @classmethod
     def normalize_source_before(cls, file_source: Optional[str]) -> str:
@@ -889,6 +871,24 @@ class InsertUrlRequest(BaseModel):
             }
         }
     )
+
+
+class InsertUrlRequest(BaseModel):
+    """Request model for crawling and inserting a web URL document."""
+
+    url: str = Field(min_length=1, description="HTTP/HTTPS URL to crawl and index")
+    chunking: Optional[TextChunkingConfig] = Field(
+        default=None,
+        description="Chunking strategy and params; omit for default fixed-token chunking",
+    )
+
+    @field_validator("url", mode="after")
+    @classmethod
+    def validate_url_scheme(cls, url: str) -> str:
+        stripped = url.strip()
+        if not stripped.startswith(("http://", "https://")):
+            raise ValueError("url must start with http:// or https://")
+        return stripped
 
 
 class InsertTextsRequest(BaseModel):
@@ -5936,7 +5936,8 @@ def create_document_routes(
 
             if fetch_result.kind == "file":
                 safe_filename = sanitize_filename(
-                    fetch_result.filename or "downloaded_document.txt"
+                    fetch_result.filename or "downloaded_document.txt",
+                    doc_manager.input_dir,
                 )
                 file_path = doc_manager.input_dir / safe_filename
                 existing_doc_data = await get_existing_doc_by_file_path_candidates(
