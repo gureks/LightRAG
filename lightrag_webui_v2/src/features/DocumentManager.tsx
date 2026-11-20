@@ -206,6 +206,7 @@ const formatMetadata = (metadata: Record<string, any>): string => {
 
 const hasDocumentDetails = (doc: DocStatusResponse): boolean => {
   return Boolean(
+    doc.tenant_id ||
     doc.track_id ||
     doc.error_msg ||
     (doc.metadata && Object.keys(doc.metadata).length > 0)
@@ -214,6 +215,11 @@ const hasDocumentDetails = (doc: DocStatusResponse): boolean => {
 
 const formatDocumentDetails = (doc: DocStatusResponse): string => {
   const details: string[] = []
+  const resolvedTenant = doc.tenant_id || doc.metadata?.tenant_id
+
+  if (resolvedTenant) {
+    details.push(`Tenant ID: ${resolvedTenant}`)
+  }
 
   if (doc.track_id) {
     details.push(`Track ID: ${doc.track_id}`)
@@ -1702,6 +1708,7 @@ export default function DocumentManager() {
                           </TableHead>
                           <TableHead>{t('documentPanel.documentManager.columns.summary')}</TableHead>
                           <TableHead>{t('documentPanel.documentManager.columns.status')}</TableHead>
+                          <TableHead>Tenant</TableHead>
                           <TableHead>{t('documentPanel.documentManager.columns.length')}</TableHead>
                           <TableHead>{t('documentPanel.documentManager.columns.chunks')}</TableHead>
                           <TableHead
@@ -1791,6 +1798,9 @@ export default function DocumentManager() {
 
                                 {hasDocumentDetails(doc) && <DocumentStatusDetailsDialog doc={doc} />}
                               </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-foreground">
+                              {doc.tenant_id || doc.metadata?.tenant_id || 'default'}
                             </TableCell>
                             <TableCell>{doc.content_length ?? '-'}</TableCell>
                             <TableCell>{doc.chunks_count ?? '-'}</TableCell>

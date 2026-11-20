@@ -18,6 +18,7 @@ from enum import Enum
 from uuid import uuid4
 from lightrag.utils import (
     logger,
+    resolve_tenant_id,
     get_pinyin_sort_key,
     performance_timing_log,
     safe_log_value,
@@ -1142,6 +1143,10 @@ class DocStatusResponse(BaseModel):
         default=None, description="Additional metadata about the document"
     )
     file_path: str = Field(description="Path to the document file")
+    tenant_id: str = Field(
+        default="default",
+        description="Active tenant / workspace identifier",
+    )
 
     @field_validator("metadata", mode="after")
     @classmethod
@@ -5891,13 +5896,14 @@ def create_document_routes(
         managed_tasks: set = Depends(get_managed_background_tasks),
         http_request: Request = None,
     ):
-        """Crawl a web URL (waiting for JS & lazy-load scroll) and index it."""
+        """Crawl a web URL (waiting for JS & lazy-load scroll) or download a supported file and index it."""
         from lightrag.kg.shared_storage import start_reserved_background_task
         from lightrag.url_extractor import (
             PaywallOrAuthError,
             RedirectLimitError,
+            UnsupportedUrlFileError,
             UrlExtractionError,
-            extract_url_content,
+            fetch_url_target,
         )
 
         enqueue_token, admission_adopted = _adopt_or_new_enqueue_token(http_request)
@@ -5905,6 +5911,81 @@ def create_document_routes(
         try:
             if not admission_adopted:
                 await _reserve_enqueue_slot(rag, enqueue_token)
+
+            try:
+                resolved_chunking = _resolve_text_chunking(request.chunking, rag)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid chunking configuration: {exc}",
+                )
+
+            try:
+                fetch_result = await fetch_url_target(
+                    request.url,
+                    is_supported_file_fn=doc_manager.is_supported_file,
+                    max_bytes=global_args.max_upload_size,
+                )
+            except (
+                PaywallOrAuthError,
+                RedirectLimitError,
+                UnsupportedUrlFileError,
+                UrlExtractionError,
+            ) as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+
+            if fetch_result.kind == "file":
+                safe_filename = sanitize_filename(
+                    fetch_result.filename or "downloaded_document.txt"
+                )
+                file_path = doc_manager.input_dir / safe_filename
+                existing_doc_data = await get_existing_doc_by_file_path_candidates(
+                    rag.doc_status, file_path
+                )
+                if existing_doc_data:
+                    status = get_doc_status_value(existing_doc_data) or "unknown"
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"Document storage already contains '{safe_filename}' "
+                            f"(Status: {status}). Delete the existing record before re-inserting."
+                        ),
+                    )
+                upload_opener = upload_file_opener(doc_manager.input_dir)
+                async with aiofiles.open(
+                    file_path, "xb", opener=upload_opener
+                ) as out_file:
+                    await out_file.write(fetch_result.content_bytes or b"")
+
+                track_id = generate_track_id("upload")
+
+                async def _file_indexing_work(started):
+                    started.set()
+                    try:
+                        await pipeline_index_file(
+                            rag,
+                            file_path,
+                            track_id,
+                            admission_token=enqueue_token,
+                        )
+                    finally:
+                        await _release_enqueue_slot(rag, enqueue_token)
+
+                async def _enqueue_backstop():
+                    await _release_enqueue_slot(rag, enqueue_token)
+
+                await start_reserved_background_task(
+                    managed_tasks,
+                    work=_file_indexing_work,
+                    backstop_release=_enqueue_backstop,
+                )
+                handed_off = True
+
+                return InsertResponse(
+                    status="success",
+                    message=f"File '{safe_filename}' downloaded from URL and queued for processing.",
+                    track_id=track_id,
+                )
 
             normalized_file_source = normalize_file_path(request.url)
             existing_doc_data = await get_existing_doc_by_file_path_candidates(
@@ -5920,19 +6001,6 @@ def create_document_routes(
                     ),
                 )
 
-            try:
-                resolved_chunking = _resolve_text_chunking(request.chunking, rag)
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Invalid chunking configuration: {exc}",
-                )
-
-            try:
-                extracted_text = await extract_url_content(request.url)
-            except (PaywallOrAuthError, RedirectLimitError, UrlExtractionError) as exc:
-                raise HTTPException(status_code=422, detail=str(exc))
-
             track_id = generate_track_id("insert")
 
             async def _indexing_work(started):
@@ -5940,7 +6008,7 @@ def create_document_routes(
                 try:
                     await pipeline_index_texts(
                         rag,
-                        [extracted_text],
+                        [fetch_result.text or ""],
                         file_sources=[normalized_file_source],
                         track_id=track_id,
                         chunking=request.chunking,
@@ -7029,6 +7097,8 @@ def create_document_routes(
                         error_msg=doc_status.error_msg,
                         metadata=doc_status.metadata,
                         file_path=normalize_file_path(doc_status.file_path),
+                        tenant_id=(doc_status.metadata or {}).get("tenant_id")
+                        or resolve_tenant_id({"workspace": rag.workspace}),
                     )
                 )
 
@@ -7181,6 +7251,8 @@ def create_document_routes(
                         error_msg=doc.error_msg,
                         metadata=doc.metadata,
                         file_path=normalize_file_path(doc.file_path),
+                        tenant_id=(doc.metadata or {}).get("tenant_id")
+                        or resolve_tenant_id({"workspace": rag.workspace}),
                     )
                 )
 

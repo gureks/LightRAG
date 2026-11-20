@@ -310,6 +310,7 @@ export type DocStatusResponse = {
   error_msg?: string
   metadata?: Record<string, any>
   file_path: string
+  tenant_id?: string
 }
 
 export type TrackStatusResponse = {
@@ -998,6 +999,11 @@ export const insertText = async (text: string): Promise<DocActionResponse> => {
 
 export const insertTexts = async (texts: string[]): Promise<DocActionResponse> => {
   const response = await axiosInstance.post('/documents/texts', { texts })
+  return response.data
+}
+
+export const insertUrl = async (url: string): Promise<DocActionResponse> => {
+  const response = await axiosInstance.post('/documents/insert/url', { url })
   return response.data
 }
 

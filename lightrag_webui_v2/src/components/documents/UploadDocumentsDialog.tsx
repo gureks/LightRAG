@@ -10,6 +10,7 @@ import {
   DialogTrigger
 } from '@/components/ui/Dialog'
 import FileUploader from '@/components/ui/FileUploader'
+import Input from '@/components/ui/Input'
 import { toast } from 'sonner'
 import { supportedFileTypes } from '@/lib/constants'
 import {
@@ -20,9 +21,9 @@ import {
   type FileTypesState
 } from '@/lib/fileTypes'
 import { errorMessage } from '@/lib/utils'
-import { getSupportedFileTypes, uploadDocument } from '@/api/lightrag'
+import { getSupportedFileTypes, insertUrl, uploadDocument } from '@/api/lightrag'
 
-import { UploadIcon } from 'lucide-react'
+import { LinkIcon, UploadIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface UploadDocumentsDialogProps {
@@ -45,6 +46,9 @@ export default function UploadDocumentsDialog({
   const [progresses, setProgresses] = useState<Record<string, number>>({})
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({})
   const [fileTypes, setFileTypes] = useState<FileTypesState>({ status: 'idle' })
+  const [urlInput, setUrlInput] = useState('')
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const [isUrlSubmitting, setIsUrlSubmitting] = useState(false)
 
   // Fetch the live allowlist + engine capability matrix while the dialog is
   // open. `loading` is entered synchronously in onOpenChange (not here) so
@@ -239,13 +243,60 @@ export default function UploadDocumentsDialog({
     [setIsUploading, setProgresses, setFileErrors, t, onDocumentsUploaded, onUploadBatchAccepted]
   )
 
+  const handleUrlSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      const trimmed = urlInput.trim()
+      if (!trimmed) {
+        setUrlError('Please enter a valid http:// or https:// URL')
+        return
+      }
+      try {
+        const parsed = new URL(trimmed)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          setUrlError('URL must start with http:// or https://')
+          return
+        }
+      } catch {
+        setUrlError('Please enter a valid URL')
+        return
+      }
+
+      setUrlError(null)
+      setIsUrlSubmitting(true)
+      const toastId = toast.loading('Fetching and ingesting URL...')
+      try {
+        const result = await insertUrl(trimmed)
+        if (result.status === 'success') {
+          toast.success(result.message || 'URL queued for ingestion', { id: toastId })
+          setUrlInput('')
+          onUploadBatchAccepted?.()
+          onDocumentsUploaded?.().catch((err) => {
+            console.error('Error refreshing documents:', err)
+          })
+        } else {
+          const msg = result.message || 'URL ingestion failed'
+          setUrlError(msg)
+          toast.error(msg, { id: toastId })
+        }
+      } catch (err) {
+        const msg = errorMessage(err)
+        setUrlError(msg)
+        toast.error(msg, { id: toastId })
+      } finally {
+        setIsUrlSubmitting(false)
+      }
+    },
+    [urlInput, onUploadBatchAccepted, onDocumentsUploaded]
+  )
+
   const uploaderInputs = deriveUploaderInputs(fileTypes)
 
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (isUploading) {
+        if (isUploading || isUrlSubmitting) {
           return
         }
         if (nextOpen) {
@@ -256,6 +307,8 @@ export default function UploadDocumentsDialog({
         } else {
           setProgresses({})
           setFileErrors({})
+          setUrlInput('')
+          setUrlError(null)
           setFileTypes({ status: 'idle' })
         }
         setOpen(nextOpen)
@@ -273,6 +326,42 @@ export default function UploadDocumentsDialog({
             {t('documentPanel.uploadDocuments.description')}
           </DialogDescription>
         </DialogHeader>
+        <form onSubmit={handleUrlSubmit} className="space-y-2 border-b border-border pb-4">
+          <label
+            htmlFor="document-url-input"
+            className="text-xs font-medium text-foreground flex items-center gap-1.5"
+          >
+            <LinkIcon className="h-3.5 w-3.5" />
+            Ingest from URL (web page or supported document file)
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="document-url-input"
+              type="url"
+              value={urlInput}
+              onChange={(e) => {
+                setUrlInput(e.target.value)
+                if (urlError) setUrlError(null)
+              }}
+              placeholder="https://example.com/article or https://example.com/report.pdf"
+              disabled={isUrlSubmitting || isUploading}
+              className="flex-1"
+            />
+            <Button
+              type="submit"
+              variant="default"
+              size="sm"
+              disabled={isUrlSubmitting || isUploading || !urlInput.trim()}
+            >
+              {isUrlSubmitting ? 'Fetching...' : 'Ingest URL'}
+            </Button>
+          </div>
+          {urlError && (
+            <p className="text-xs text-danger" role="alert">
+              {urlError}
+            </p>
+          )}
+        </form>
         <FileUploader
           maxFileCount={Infinity}
           maxSize={200 * 1024 * 1024}

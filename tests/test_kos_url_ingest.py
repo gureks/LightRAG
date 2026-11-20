@@ -10,8 +10,10 @@ import pytest
 from lightrag.url_extractor import (
     PaywallOrAuthError,
     RedirectLimitError,
+    UnsupportedUrlFileError,
     _scroll_full_page,
     extract_url_content,
+    fetch_url_target,
 )
 from lightrag.utils import compute_mdhash_id
 
@@ -78,3 +80,40 @@ async def test_extract_url_content_propagates_paywall_and_redirect_errors():
     ):
         with pytest.raises(RedirectLimitError):
             await extract_url_content("https://example.com/loop")
+
+
+@pytest.mark.asyncio
+async def test_fetch_url_target_downloads_supported_file_and_rejects_unsupported():
+    # Unsupported file extension should be rejected before downloading
+    with pytest.raises(UnsupportedUrlFileError):
+        await fetch_url_target(
+            "https://example.com/malware.exe",
+            is_supported_file_fn=lambda name: name.endswith((".pdf", ".txt")),
+        )
+
+    # Supported file extension should download bytes and return kind="file"
+    mock_head_resp = MagicMock(
+        status_code=200,
+        headers={"content-type": "application/pdf"},
+        url="https://example.com/report.pdf",
+    )
+    mock_get_resp = MagicMock(
+        status_code=200,
+        content=b"%PDF-1.4 fake pdf",
+    )
+
+    mock_client = AsyncMock()
+    mock_client.head = AsyncMock(return_value=mock_head_resp)
+    mock_client.get = AsyncMock(return_value=mock_get_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("lightrag.url_extractor.httpx.AsyncClient", return_value=mock_client):
+        result = await fetch_url_target(
+            "https://example.com/report.pdf",
+            is_supported_file_fn=lambda name: name.endswith((".pdf", ".txt")),
+        )
+
+    assert result.kind == "file"
+    assert result.filename == "report.pdf"
+    assert result.content_bytes == b"%PDF-1.4 fake pdf"
