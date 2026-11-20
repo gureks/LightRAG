@@ -24,6 +24,7 @@ from concurrent.futures import Future as ConcurrentFuture, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial, wraps
+import hashlib
 from hashlib import md5
 from pathlib import Path
 from typing import (
@@ -1037,12 +1038,47 @@ def _validate_cached_response_format(response_format: Any | None) -> None:
     )
 
 
+# Per-request / future OAuth dynamic tenant context. When set, takes precedence
+# over static WORKSPACE env / global_config["workspace"] so multiple users can
+# share a tenant_id (many-users-to-one-tenant) or switch workspaces per request.
+tenant_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "tenant_id_ctx", default=None
+)
+
+
+def resolve_tenant_id(global_config: dict[str, Any] | None = None) -> str:
+    """Resolve the active tenant_id dynamically or from WORKSPACE config.
+
+    Priority:
+    1. Active request/auth ContextVar (``tenant_id_ctx``) for per-user / OAuth routing
+    2. ``global_config["tenant_id"]``
+    3. ``global_config["workspace"]`` (repurposed LightRAG workspace key)
+    4. ``WORKSPACE`` environment variable, falling back to ``"default"``
+    """
+    ctx_tenant = tenant_id_ctx.get()
+    if ctx_tenant and str(ctx_tenant).strip():
+        return str(ctx_tenant).strip()
+    if global_config:
+        for key in ("tenant_id", "workspace"):
+            val = global_config.get(key)
+            if val and str(val).strip():
+                return str(val).strip()
+    env_workspace = os.getenv("WORKSPACE", "").strip()
+    return env_workspace or "default"
+
+
 def compute_mdhash_id(content: str, prefix: str = "") -> str:
     """
     Compute a unique ID for a given content string.
 
-    The ID is a combination of the given prefix and the MD5 hash of the content string.
+    Uses ``HASH_ALGORITHM`` from the environment when configured (e.g.
+    ``sha256``), defaulting to LightRAG's legacy MD5 ``compute_args_hash``
+    so existing persisted IDs stay backward-compatible.
     """
+    algo = os.getenv("HASH_ALGORITHM", "").strip().lower()
+    if algo and algo != "md5":
+        digest = hashlib.new(algo, content.encode("utf-8", errors="replace")).hexdigest()
+        return prefix + digest
     return prefix + compute_args_hash(content)
 
 

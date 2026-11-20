@@ -843,6 +843,24 @@ class InsertTextRequest(BaseModel):
             raise ValueError("text cannot be empty or whitespace-only")
         return stripped
 
+
+class InsertUrlRequest(BaseModel):
+    """Request model for crawling and inserting a web URL document."""
+
+    url: str = Field(min_length=1, description="HTTP/HTTPS URL to crawl and index")
+    chunking: Optional[TextChunkingConfig] = Field(
+        default=None,
+        description="Chunking strategy and params; omit for default fixed-token chunking",
+    )
+
+    @field_validator("url", mode="after")
+    @classmethod
+    def validate_url_scheme(cls, url: str) -> str:
+        stripped = url.strip()
+        if not stripped.startswith(("http://", "https://")):
+            raise ValueError("url must start with http:// or https://")
+        return stripped
+
     @field_validator("file_source", mode="before")
     @classmethod
     def normalize_source_before(cls, file_source: Optional[str]) -> str:
@@ -5857,6 +5875,100 @@ def create_document_routes(
             raise
         except Exception as e:
             logger.error(f"Error /documents/text: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise internal_server_error(e)
+        finally:
+            if not handed_off:
+                await _release_enqueue_slot(rag, enqueue_token)
+
+    @router.post(
+        "/insert/url",
+        response_model=InsertResponse,
+        dependencies=[Depends(combined_auth)],
+    )
+    async def insert_url(
+        request: InsertUrlRequest,
+        managed_tasks: set = Depends(get_managed_background_tasks),
+        http_request: Request = None,
+    ):
+        """Crawl a web URL (waiting for JS & lazy-load scroll) and index it."""
+        from lightrag.kg.shared_storage import start_reserved_background_task
+        from lightrag.url_extractor import (
+            PaywallOrAuthError,
+            RedirectLimitError,
+            UrlExtractionError,
+            extract_url_content,
+        )
+
+        enqueue_token, admission_adopted = _adopt_or_new_enqueue_token(http_request)
+        handed_off = False
+        try:
+            if not admission_adopted:
+                await _reserve_enqueue_slot(rag, enqueue_token)
+
+            normalized_file_source = normalize_file_path(request.url)
+            existing_doc_data = await get_existing_doc_by_file_path_candidates(
+                rag.doc_status, normalized_file_source
+            )
+            if existing_doc_data:
+                status = get_doc_status_value(existing_doc_data) or "unknown"
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Document storage already contains '{normalized_file_source}' "
+                        f"(Status: {status}). Delete the existing record before re-inserting."
+                    ),
+                )
+
+            try:
+                resolved_chunking = _resolve_text_chunking(request.chunking, rag)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid chunking configuration: {exc}",
+                )
+
+            try:
+                extracted_text = await extract_url_content(request.url)
+            except (PaywallOrAuthError, RedirectLimitError, UrlExtractionError) as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+
+            track_id = generate_track_id("insert")
+
+            async def _indexing_work(started):
+                started.set()
+                try:
+                    await pipeline_index_texts(
+                        rag,
+                        [extracted_text],
+                        file_sources=[normalized_file_source],
+                        track_id=track_id,
+                        chunking=request.chunking,
+                        resolved_chunking=resolved_chunking,
+                        admission_token=enqueue_token,
+                    )
+                finally:
+                    await _release_enqueue_slot(rag, enqueue_token)
+
+            async def _enqueue_backstop():
+                await _release_enqueue_slot(rag, enqueue_token)
+
+            await start_reserved_background_task(
+                managed_tasks,
+                work=_indexing_work,
+                backstop_release=_enqueue_backstop,
+            )
+            handed_off = True
+
+            return InsertResponse(
+                status="success",
+                message="URL content extracted and queued for background processing.",
+                track_id=track_id,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error /documents/insert/url: {str(e)}")
             logger.error(traceback.format_exc())
             raise internal_server_error(e)
         finally:

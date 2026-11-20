@@ -80,11 +80,13 @@ api = [
     # which are unchanged in 3.x.
     "pandas>=2.0.0,<4.0.0",
     "pipmaster",
+    "playwright>=1.49.0",
     "pydantic",
     "pypinyin",
     "PyYAML>=6.0,<7.0",
     "python-dotenv>=1.2.0",
     "setuptools",
+    "trafilatura>=2.0.0",
     "tenacity",
     # 0.7.0 adds o200k_base, required by the default gpt-4o-mini, and is the
     # oldest release whose encode_batch/decode_batch fan encode()/decode() of

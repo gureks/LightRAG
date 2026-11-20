@@ -19,6 +19,7 @@ from lightrag.exceptions import (
 from lightrag.utils import (
     logger,
     compute_mdhash_id,
+    resolve_tenant_id,
     Tokenizer,
     TokenBudgetError,
     normalize_entity_name,
@@ -1833,6 +1834,7 @@ async def _rebuild_single_entity(
                 else current_entity.get("file_path", "unknown_source"),
                 "created_at": int(time.time()),
                 "truncate": truncation_info,
+                "tenant_id": resolve_tenant_id(global_config),
             }
 
             # Construct and verify the VDB payload BEFORE the first graph
@@ -2267,6 +2269,12 @@ async def _rebuild_single_relationship(
         truncation_info = ""
 
     # Update relationship in graph storage
+    rebuilt_file_path = (
+        GRAPH_FIELD_SEP.join([fp for fp in file_paths_list if fp])
+        if file_paths_list
+        else current_relationship.get("file_path", "unknown_source")
+    )
+    tenant_id = resolve_tenant_id(global_config)
     updated_relationship_data = {
         **current_relationship,
         "description": final_description
@@ -2275,10 +2283,16 @@ async def _rebuild_single_relationship(
         "keywords": combined_keywords,
         "weight": weight,
         "source_id": GRAPH_FIELD_SEP.join(limited_chunk_ids),
-        "file_path": GRAPH_FIELD_SEP.join([fp for fp in file_paths_list if fp])
-        if file_paths_list
-        else current_relationship.get("file_path", "unknown_source"),
+        "file_path": rebuilt_file_path,
         "truncate": truncation_info,
+        "tenant_id": tenant_id,
+        "valid_from": current_relationship.get(
+            "valid_from", current_relationship.get("created_at", int(time.time()))
+        ),
+        "valid_to": current_relationship.get("valid_to", None),
+        "source_doc_id": rebuilt_file_path.split(GRAPH_FIELD_SEP)[0],
+        "author": current_relationship.get("author", ""),
+        "confidence": current_relationship.get("confidence", 1.0),
     }
 
     # Ensure both endpoint nodes exist before writing the edge back
@@ -2302,6 +2316,7 @@ async def _rebuild_single_relationship(
                 "file_path": node_file_path,
                 "created_at": node_created_at,
                 "truncate": "",
+                "tenant_id": tenant_id,
             }
 
             # Construct and verify the VDB payload BEFORE the first graph
@@ -2776,6 +2791,7 @@ async def _merge_nodes_then_upsert(
             file_path=file_path,
             created_at=int(time.time()),
             truncate=truncation_info,
+            tenant_id=resolve_tenant_id(global_config),
         )
 
         # Construct and verify the VDB payload BEFORE the first graph
@@ -3214,6 +3230,7 @@ async def _merge_edges_then_upsert(
                     "file_path": file_path,
                     "created_at": node_created_at,
                     "truncate": "",
+                    "tenant_id": resolve_tenant_id(global_config),
                 }
 
                 # Construct and verify the VDB payload BEFORE the first
@@ -3463,6 +3480,16 @@ async def _merge_edges_then_upsert(
                 file_path=file_path,
                 created_at=edge_created_at,
                 truncate=truncation_info,
+                tenant_id=resolve_tenant_id(global_config),
+                valid_from=edge_created_at,
+                valid_to=None,
+                source_doc_id=(
+                    file_path.split(GRAPH_FIELD_SEP)[0]
+                    if file_path
+                    else "unknown_source"
+                ),
+                author="",
+                confidence=1.0,
             ),
         )
         edge_upsert_elapsed = time.perf_counter() - edge_upsert_started
